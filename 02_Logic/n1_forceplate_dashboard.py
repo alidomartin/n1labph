@@ -51,27 +51,41 @@ h1,h2,h3{font-weight:700;letter-spacing:-.02em}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Metric taxonomy (ODS framework) ───────────────────────────────────────────
-OUTPUT_M   = ["Jump Height (Imp-Mom) [cm]", "RSI-modified [m/s]", "Flight Time:Contraction Time"]
-DRIVER_M   = ["Concentric Peak Force [N]", "Eccentric Braking RFD [N/s]",
-              "Concentric Impulse-100ms [N s]", "Takeoff Peak Force [N]",
-              "Eccentric Peak Force [N]"]
-STRATEGY_M = ["Eccentric Duration [ms]", "Concentric Duration [ms]",
-              "Countermovement Depth [cm]", "Concentric Peak Velocity [m/s]",
-              "Eccentric Peak Velocity [m/s]", "Contraction Time [ms]"]
-ASYM_M     = ["Concentric Impulse-100ms % (Asym) (%)", "Concentric Mean Force % (Asym) (%)",
-              "Eccentric Mean Force % (Asym) (%)", "P2 Concentric Impulse % (Asym) (%)"]
-POWER_M    = ["Peak Power [W]", "Peak Power / BM [W/kg]"]
+# ── Metric taxonomy — keyword-based so it works with any CSV format ────────────
+OUTPUT_KW   = ["jump height","rsi","flight time"]
+DRIVER_KW   = ["peak force","braking rfd","impulse","takeoff"]
+STRATEGY_KW = ["duration","depth","peak velocity","contraction time"]
+ASYM_KW     = ["asym"]
+POWER_KW    = ["power"]
 
-ALL_KNOWN  = OUTPUT_M + DRIVER_M + STRATEGY_M + ASYM_M + POWER_M
+def classify_col(col):
+    c = col.lower()
+    if any(k in c for k in ASYM_KW):   return "Asymmetry"
+    if any(k in c for k in OUTPUT_KW):  return "Output"
+    if any(k in c for k in DRIVER_KW):  return "Driver"
+    if any(k in c for k in STRATEGY_KW):return "Strategy"
+    if any(k in c for k in POWER_KW):   return "Power"
+    return "Other"
+
+def get_cols(df, keywords):
+    """Return numeric columns whose names contain any of the keywords."""
+    result = []
+    for c in df.columns:
+        if df[c].dtype not in [np.float64, np.int64, np.float32]: continue
+        if any(k in c.lower() for k in keywords):
+            result.append(c)
+    return result
+
+# Canonical lists — populated after data load (see sidebar)
+OUTPUT_M = DRIVER_M = STRATEGY_M = ASYM_M = POWER_M = []
 
 QUICK_FILTER = {
-    "All":            [],
-    "Output":         OUTPUT_M,
-    "Driver":         DRIVER_M,
-    "Strategy":       STRATEGY_M,
-    "Asymmetry":      ASYM_M,
-    "Power":          POWER_M,
+    "All":       [],
+    "Output":    [],
+    "Driver":    [],
+    "Strategy":  [],
+    "Asymmetry": [],
+    "Power":     [],
 }
 
 # ── Stat helpers ───────────────────────────────────────────────────────────────
@@ -159,6 +173,18 @@ with st.sidebar:
         df = load(sp)
     else:
         st.info("Upload a CSV to begin."); st.stop()
+
+    # Auto-classify columns from whatever CSV was loaded
+    OUTPUT_M   = get_cols(df, OUTPUT_KW)
+    DRIVER_M   = get_cols(df, DRIVER_KW)
+    STRATEGY_M = get_cols(df, STRATEGY_KW)
+    ASYM_M     = get_cols(df, ASYM_KW)
+    POWER_M    = get_cols(df, POWER_KW)
+    QUICK_FILTER["Output"]    = OUTPUT_M
+    QUICK_FILTER["Driver"]    = DRIVER_M
+    QUICK_FILTER["Strategy"]  = STRATEGY_M
+    QUICK_FILTER["Asymmetry"] = ASYM_M
+    QUICK_FILTER["Power"]     = POWER_M
 
     athletes = sorted(df["Name"].unique().tolist())
     st.divider()
@@ -597,7 +623,14 @@ with t5:
 
         # KPI row
         kpi_mets = [m for m in (OUTPUT_M + DRIVER_M) if m in adf.columns][:6]
-        cols = st.columns(len(kpi_mets))
+        if not kpi_mets:
+            # fallback: take first 6 numeric columns
+            kpi_mets = [c for c in adf.columns if adf[c].dtype in [np.float64, np.int64]
+                        and adf[c].notna().any()][:6]
+        if not kpi_mets:
+            st.info("No numeric metrics found for this athlete.")
+        else:
+            cols = st.columns(len(kpi_mets))
         for i, m in enumerate(kpi_mets):
             s = adf[m].dropna()
             if s.empty: continue
