@@ -1,6 +1,6 @@
 """
-N1 Performance Lab — Force Plate Analysis Dashboard v3
-7-tab system: Data Quality | Metrics | PCA & Clustering | Trends | Athlete Profiles | Summary | About & References
+N1 Performance Lab — Force Plate Analysis Dashboard v4
+8-tab system: Coach View | Data Quality | Metrics | PCA & Clustering | Trends | Athlete Profiles | Summary | About & References
 Run: streamlit run 02_Logic/n1_forceplate_dashboard.py
 """
 
@@ -48,6 +48,20 @@ h1,h2,h3{font-weight:700;letter-spacing:-.02em}
          padding:2px 7px;border-radius:2px}
 .badge-n{display:inline-block;background:#BDC3C7;color:#fff;font-size:10px;font-weight:700;
          padding:2px 7px;border-radius:2px}
+/* ── Coach View cards ─────────────────────────────────────────────── */
+.cv-card{border-radius:8px;padding:20px 22px;margin-bottom:4px;border:1px solid #E8E8E8}
+.cv-name{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px}
+.cv-status{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.cv-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.cv-metric{display:inline-block;font-size:12px;margin-right:14px;margin-top:6px}
+.cv-metric-label{font-size:10px;color:#888;display:block;margin-bottom:1px}
+.cv-metric-val{font-weight:700;font-size:14px}
+.cv-flag{font-size:10px;font-weight:600}
+.cv-rec{font-size:12px;color:#444;margin-top:10px;padding-top:10px;border-top:1px solid #F0F0F0;line-height:1.5}
+.cv-rec-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:3px}
+.cv-asym-bar{display:inline-block;height:8px;border-radius:2px;vertical-align:middle}
+.cv-section{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+            color:#888;margin:18px 0 8px 0}
 </style>
 """, unsafe_allow_html=True)
 
@@ -206,11 +220,286 @@ fdf = df[df["Name"].isin(sel_athletes)].copy()
 # ════════════════════════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════════════════════════
-t1, t2, t3, t4, t5, t6, t7 = st.tabs([
+t0, t1, t2, t3, t4, t5, t6, t7 = st.tabs([
+    "🏐 Coach View",
     "Data Quality", "Metrics Analysis", "PCA & Clustering",
     "Performance Trends", "Athlete Profiles", "Summary Report",
     "About & References"
 ])
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 0 — COACH VIEW
+# ════════════════════════════════════════════════════════════════════════════════
+with t0:
+    # ── Header ─────────────────────────────────────────────────────────────────
+    st.markdown(
+        "<h2 style='margin-bottom:2px'>Squad Readiness</h2>"
+        "<p style='color:#888;font-size:13px;margin-top:0'>Latest session · SWC-referenced · Hawkin Dynamics CMJ</p>",
+        unsafe_allow_html=True)
+
+    # Key metrics to surface in coach cards — auto-detected from loaded data
+    CV_OUTPUT  = ["jump height", "mrsi", "rsi", "flight time", "takeoff velocity"]
+    CV_ASYM    = ["l|r", "asym"]
+    CV_DRIVER  = ["braking rfd", "propulsive net", "impulse ratio"]
+
+    def cv_find(df, keywords):
+        for c in df.columns:
+            if df[c].dtype not in [np.float64, np.int64, np.float32]: continue
+            if any(k in c.lower() for k in keywords) and df[c].notna().any():
+                return c
+        return None
+
+    jh_col   = cv_find(fdf, ["jump height"])
+    mrsi_col = cv_find(fdf, ["mrsi","m_rsi","modified"])
+    rsi_col  = cv_find(fdf, ["rsi"]) if not mrsi_col else None
+    asym_col = cv_find(fdf, ["l|r braking impulse","braking impulse asym"])
+    rfd_col  = cv_find(fdf, ["braking rfd"])
+    tv_col   = cv_find(fdf, ["takeoff velocity"])
+
+    # ── Readiness colour logic ──────────────────────────────────────────────────
+    def athlete_readiness(adf, all_athletes_df):
+        """Return (status_label, color_hex, dot_color, flags_list, rec_text)."""
+        red_flags, amber_flags = [], []
+
+        def check(col, label, higher_is_better=True):
+            if col is None or col not in adf.columns: return
+            s = adf[col].dropna()
+            if len(s) < 2: return
+            last_v = s.iloc[-1]; bl = s.mean(); sw = swc(s)
+            if sw == 0: return
+            r = (last_v - bl) / sw
+            direction = r if higher_is_better else -r
+            if direction <= -1:
+                red_flags.append(f"{label} ▼")
+            elif direction <= -0.5:
+                amber_flags.append(f"{label} ~")
+
+        check(jh_col,   "Jump Height")
+        check(mrsi_col, "mRSI")
+        check(rsi_col,  "RSI")
+        check(tv_col,   "Takeoff Velocity")
+        check(rfd_col,  "Braking RFD")
+
+        # Asymmetry flag — absolute value > threshold
+        asym_flag = False
+        asym_val  = None
+        if asym_col and asym_col in adf.columns:
+            last_asym = adf[asym_col].dropna()
+            if not last_asym.empty:
+                asym_val = abs(last_asym.iloc[-1])
+                if asym_val >= 15:
+                    red_flags.append(f"Asymmetry {asym_val:.1f}% ⚠")
+                    asym_flag = True
+                elif asym_val >= 10:
+                    amber_flags.append(f"Asymmetry {asym_val:.1f}%")
+
+        n_red = len(red_flags)
+        if n_red >= 2 or asym_flag:
+            status = "HIGH LOAD"
+            bg     = "#FFF0F0"
+            border = "#E74C3C"
+            dot    = "#E74C3C"
+        elif n_red == 1 or len(amber_flags) >= 2:
+            status = "MONITOR"
+            bg     = "#FFFBF0"
+            border = "#F39C12"
+            dot    = "#F39C12"
+        elif amber_flags:
+            status = "CAUTION"
+            bg     = "#FFFBF0"
+            border = "#F39C12"
+            dot    = "#F39C12"
+        else:
+            status = "READY"
+            bg     = "#F0FFF6"
+            border = "#2ECC71"
+            dot    = "#2ECC71"
+
+        all_flags = red_flags + amber_flags
+        flags_str = " · ".join(all_flags) if all_flags else "No flags"
+
+        # Recommendation
+        if status == "HIGH LOAD":
+            rec = "Reduce jump volume and high-intensity work. Prioritise recovery before next session."
+            if asym_flag:
+                rec = f"Asymmetry at {asym_val:.1f}% — limit deceleration and COD tasks. " + rec
+        elif status in ("MONITOR", "CAUTION"):
+            rec = "Manageable load. Monitor during session. Reduce intensity if output drops further."
+        else:
+            rec = "Available for full training. No restrictions indicated."
+
+        return status, bg, border, dot, flags_str, rec, asym_val
+
+    # ── Latest metric values ────────────────────────────────────────────────────
+    def latest_metric(adf, col):
+        if col is None or col not in adf.columns: return None
+        s = adf[col].dropna()
+        return round(s.iloc[-1], 2) if not s.empty else None
+
+    def flag_color_hex(adf, col, higher_is_better=True):
+        if col is None or col not in adf.columns: return "#BDC3C7"
+        s = adf[col].dropna()
+        if len(s) < 2: return "#BDC3C7"
+        last_v = s.iloc[-1]; bl = s.mean(); sw = swc(s)
+        if sw == 0: return "#BDC3C7"
+        r = (last_v - bl) / sw
+        direction = r if higher_is_better else -r
+        if direction >= 1:  return "#2ECC71"
+        if direction <= -1: return "#E74C3C"
+        if abs(direction) >= 0.5: return "#F39C12"
+        return "#1A1A1A"
+
+    # ── Sort athletes: High Load → Monitor → Caution → Ready ───────────────────
+    STATUS_ORDER = {"HIGH LOAD": 0, "MONITOR": 1, "CAUTION": 2, "READY": 3}
+    athlete_cards = []
+    for a in sel_athletes:
+        adf = fdf[fdf["Name"] == a].sort_values("Date")
+        status, bg, border, dot, flags_str, rec, asym_val = athlete_readiness(adf, fdf)
+        jh   = latest_metric(adf, jh_col)
+        mrsi = latest_metric(adf, mrsi_col)
+        tv   = latest_metric(adf, tv_col)
+        asym = latest_metric(adf, asym_col)
+        athlete_cards.append((STATUS_ORDER[status], a, status, bg, border,
+                               dot, flags_str, rec, jh, mrsi, tv, asym, adf))
+    athlete_cards.sort(key=lambda x: x[0])
+
+    # ── Squad summary bar ───────────────────────────────────────────────────────
+    counts = {"READY": 0, "CAUTION": 0, "MONITOR": 0, "HIGH LOAD": 0}
+    for card in athlete_cards:
+        counts[card[2]] += 1
+
+    bar_cols = st.columns(4)
+    status_cfg = [
+        ("READY",     "#2ECC71", "✓ Ready",     "Full training. No restrictions."),
+        ("CAUTION",   "#F39C12", "~ Caution",   "Monitor during session."),
+        ("MONITOR",   "#F39C12", "⚠ Monitor",   "Reduce intensity or volume."),
+        ("HIGH LOAD", "#E74C3C", "✕ High Load", "Limit high-intensity work."),
+    ]
+    for i, (s, col_hex, label, desc) in enumerate(status_cfg):
+        with bar_cols[i]:
+            st.markdown(
+                f"<div style='text-align:center;padding:14px 8px;background:#F8F8F8;"
+                f"border-top:3px solid {col_hex};border-radius:4px'>"
+                f"<div style='font-size:28px;font-weight:700;color:{col_hex}'>{counts[s]}</div>"
+                f"<div style='font-size:10px;font-weight:700;letter-spacing:.1em;"
+                f"text-transform:uppercase;color:#555;margin-top:2px'>{label}</div>"
+                f"<div style='font-size:10px;color:#888;margin-top:3px'>{desc}</div>"
+                f"</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='cv-section'>INDIVIDUAL ATHLETE STATUS</div>",
+                unsafe_allow_html=True)
+
+    # ── Athlete cards ───────────────────────────────────────────────────────────
+    for (_, a, status, bg, border, dot, flags_str, rec,
+         jh, mrsi, tv, asym, adf) in athlete_cards:
+
+        jh_c   = flag_color_hex(adf, jh_col)
+        mrsi_c = flag_color_hex(adf, mrsi_col)
+        tv_c   = flag_color_hex(adf, tv_col)
+
+        # Asymmetry bar visual
+        asym_bar = ""
+        if asym is not None:
+            pct = min(abs(asym), 30)
+            asym_c = "#E74C3C" if abs(asym) >= 15 else "#F39C12" if abs(asym) >= 10 else "#2ECC71"
+            asym_bar = (
+                f"<span class='cv-metric'>"
+                f"<span class='cv-metric-label'>L|R Asymmetry</span>"
+                f"<span class='cv-metric-val' style='color:{asym_c}'>{asym:+.1f}%</span>"
+                f"</span>"
+            )
+
+        metrics_html = ""
+        if jh is not None:
+            metrics_html += (f"<span class='cv-metric'>"
+                             f"<span class='cv-metric-label'>Jump Height</span>"
+                             f"<span class='cv-metric-val' style='color:{jh_c}'>{jh} m</span>"
+                             f"</span>")
+        if mrsi is not None:
+            metrics_html += (f"<span class='cv-metric'>"
+                             f"<span class='cv-metric-label'>mRSI</span>"
+                             f"<span class='cv-metric-val' style='color:{mrsi_c}'>{mrsi}</span>"
+                             f"</span>")
+        if tv is not None:
+            metrics_html += (f"<span class='cv-metric'>"
+                             f"<span class='cv-metric-label'>Takeoff Velocity</span>"
+                             f"<span class='cv-metric-val' style='color:{tv_c}'>{tv} m/s</span>"
+                             f"</span>")
+        metrics_html += asym_bar
+
+        st.markdown(
+            f"<div class='cv-card' style='background:{bg};border-left:4px solid {border}'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
+            f"<div>"
+            f"<div class='cv-name'>{a}</div>"
+            f"<div class='cv-status' style='color:{dot}'>"
+            f"<span class='cv-dot' style='background:{dot}'></span>{status}"
+            f"</div>"
+            f"</div>"
+            f"<div style='text-align:right;font-size:11px;color:#888;max-width:50%'>"
+            f"<b style='color:{dot}'>{flags_str}</b>"
+            f"</div>"
+            f"</div>"
+            f"{metrics_html}"
+            f"<div class='cv-rec'>"
+            f"<div class='cv-rec-label'>Recommendation</div>"
+            f"{rec}"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True)
+
+    # ── Jump height squad bar chart ─────────────────────────────────────────────
+    if jh_col:
+        st.markdown("<div class='cv-section'>SQUAD JUMP HEIGHT — LATEST VS BASELINE</div>",
+                    unsafe_allow_html=True)
+        bar_names, bar_latest, bar_baseline, bar_colors = [], [], [], []
+        for (_, a, status, *rest, adf) in athlete_cards:
+            s = adf[jh_col].dropna()
+            if len(s) < 2: continue
+            bar_names.append(a.split()[0])   # first name only
+            bar_latest.append(round(s.iloc[-1], 3))
+            bar_baseline.append(round(s.mean(), 3))
+            bar_colors.append(
+                "#E74C3C" if status == "HIGH LOAD" else
+                "#F39C12" if status in ("MONITOR", "CAUTION") else "#2ECC71")
+
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(
+            name="Baseline (mean)",
+            x=bar_names, y=bar_baseline,
+            marker_color="#E8E8E8",
+            text=[f"{v:.2f}" for v in bar_baseline],
+            textposition="inside",
+            textfont=dict(color="#888", size=10),
+        ))
+        fig_bar.add_trace(go.Bar(
+            name="Latest",
+            x=bar_names, y=bar_latest,
+            marker_color=bar_colors,
+            text=[f"{v:.2f}" for v in bar_latest],
+            textposition="outside",
+            textfont=dict(size=11, color="#1A1A1A"),
+        ))
+        fig_bar.update_layout(
+            barmode="overlay",
+            plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+            height=260,
+            margin=dict(l=8, r=8, t=10, b=8),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                        font=dict(size=10)),
+            xaxis=dict(showgrid=False, tickfont=dict(size=11, family="Inter")),
+            yaxis=dict(showgrid=True, gridcolor="#F0F0F0",
+                       title="Jump Height (m)", tickfont=dict(size=9)),
+            font=dict(family="Inter"),
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown(
+        "<p style='font-size:10px;color:#aaa;text-align:center'>"
+        "N1 Performance Lab · Coach View · SWC thresholds (Hopkins) · "
+        "Red = ≥2 flags or asymmetry >15% · Amber = 1 flag or asymmetry 10–15%"
+        "</p>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TAB 1 — DATA QUALITY
