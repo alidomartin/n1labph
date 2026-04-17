@@ -1,6 +1,6 @@
 """
-N1 Performance Lab — Force Plate Analysis Dashboard v2
-6-tab system: Data Quality | Metrics | PCA & Clustering | Trends | Athlete Profiles | Summary
+N1 Performance Lab — Force Plate Analysis Dashboard v3
+7-tab system: Data Quality | Metrics | PCA & Clustering | Trends | Athlete Profiles | Summary | About & References
 Run: streamlit run 02_Logic/n1_forceplate_dashboard.py
 """
 
@@ -206,9 +206,10 @@ fdf = df[df["Name"].isin(sel_athletes)].copy()
 # ════════════════════════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════════════════════════
-t1, t2, t3, t4, t5, t6 = st.tabs([
+t1, t2, t3, t4, t5, t6, t7 = st.tabs([
     "Data Quality", "Metrics Analysis", "PCA & Clustering",
-    "Performance Trends", "Athlete Profiles", "Summary Report"
+    "Performance Trends", "Athlete Profiles", "Summary Report",
+    "About & References"
 ])
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -682,22 +683,26 @@ with t5:
 
         # Head-to-head comparison
         st.markdown("#### Head-to-Head Comparison")
-        opponent = st.selectbox("Compare against", [a for a in sel_athletes if a != sel_athlete])
-        odf = fdf[fdf["Name"]==opponent].sort_values("Date")
-        h2h_pool = [m for m in radar_pool if m in adf.columns and m in odf.columns]
-        h2h_rows = []
-        for m in h2h_pool:
-            av = adf[m].dropna(); ov = odf[m].dropna()
-            if av.empty or ov.empty: continue
-            a_last, o_last = av.iloc[-1], ov.iloc[-1]
-            win = sel_athlete if a_last > o_last else opponent if o_last > a_last else "Tie"
-            h2h_rows.append({
-                "Metric": m, sel_athlete: round(a_last,2), opponent: round(o_last,2),
-                "Δ": round(a_last-o_last,2), "Winner": win
-            })
-        if h2h_rows:
-            h2h_df = pd.DataFrame(h2h_rows)
-            st.dataframe(h2h_df, use_container_width=True, hide_index=True)
+        h2h_options = [a for a in sel_athletes if a != sel_athlete]
+        if not h2h_options:
+            st.info("Select additional athletes in the sidebar to enable head-to-head comparison.")
+        else:
+            opponent = st.selectbox("Compare against", h2h_options)
+            odf = fdf[fdf["Name"]==opponent].sort_values("Date")
+            h2h_pool = [m for m in radar_pool if m in adf.columns and m in odf.columns]
+            h2h_rows = []
+            for m in h2h_pool:
+                av = adf[m].dropna(); ov = odf[m].dropna()
+                if av.empty or ov.empty: continue
+                a_last, o_last = av.iloc[-1], ov.iloc[-1]
+                win = sel_athlete if a_last > o_last else opponent if o_last > a_last else "Tie"
+                h2h_rows.append({
+                    "Metric": m, sel_athlete: round(a_last,2), opponent: round(o_last,2),
+                    "Δ": round(a_last-o_last,2), "Winner": win
+                })
+            if h2h_rows:
+                h2h_df = pd.DataFrame(h2h_rows)
+                st.dataframe(h2h_df, use_container_width=True, hide_index=True)
 
         # Trend section
         st.markdown("#### Longitudinal Trends")
@@ -791,11 +796,125 @@ with t6:
         st.download_button("Cleaned Raw CSV", fdf.to_csv(index=False),
                            "n1_cleaned_data.csv", "text/csv")
 
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 7 — ABOUT & REFERENCES
+# ════════════════════════════════════════════════════════════════════════════════
+with t7:
+    st.markdown("### About This Dashboard")
+    st.markdown(
+        "The N1 Force Plate Dashboard is a web-based analysis platform built exclusively "
+        "for **Hawkin Dynamics** CSV exports. Upload your data, select your focus, and move "
+        "from raw numbers to training decisions — in under ten minutes."
+    )
+
+    st.divider()
+
+    # ── 10-Minute Workflow ──────────────────────────────────────────────────────
+    st.markdown("#### The 10-Minute Workflow")
+    steps = [
+        ("1. Upload your Hawkin Dynamics CSV export",
+         "Drag and drop your export file. The dashboard auto-detects column names — no formatting required."),
+        ("2. Select your analysis focus",
+         "Use the category filter (Output, Driver, Strategy, Asymmetry, Power) or search by keyword to narrow to the metrics that matter for your current block."),
+        ("3. Choose optimal cluster count",
+         "The app suggests a silhouette score for each K — pick the cluster count that produces meaningful, coaching-relevant groups."),
+        ("4. Review PCA variance explanation",
+         "The scree plot shows how much of your data story is captured by each principal component. Aim for ≥70% cumulative variance before drawing conclusions."),
+        ("5. Explore athlete groupings",
+         "Interactive scatter plots let you hover, zoom, and discuss clusters in team meetings without leaving the browser."),
+        ("6. Export insights",
+         "Download cluster assignments, SWC summaries, or cleaned raw data — ready for program adjustment or longitudinal tracking."),
+    ]
+    for title, desc in steps:
+        with st.expander(title):
+            st.markdown(desc)
+
+    st.divider()
+
+    # ── Longitudinal Integration ────────────────────────────────────────────────
+    st.markdown("#### Making It Stick in Your Workflow")
+    st.markdown("""
+- **Monthly cluster reviews** during periodization planning — track whether your squad profile is shifting as intended.
+- **New athlete assessments** — benchmark incoming athletes against existing clusters immediately.
+- **Progress tracking** — watch athletes migrate between clusters as they develop; cluster migration is your objective evidence of adaptation.
+- **Real-time discussions** — pull up the app during team meetings to ground coaching decisions in data.
+""")
+
+    st.divider()
+
+    # ── Performance Tracking ────────────────────────────────────────────────────
+    st.markdown("#### Performance Tracking Over Time")
+    st.markdown("""
+The **Performance Trends** tab provides:
+
+| Feature | Description |
+|---|---|
+| Trend analysis | Is your training moving athletes in the right direction? |
+| Cluster migration | Watch athletes develop and move between performance groups. |
+| Program effectiveness | Validate coaching interventions with objective SWC-referenced data. |
+| Individual trajectories | Track specific athlete development patterns session by session. |
+""")
+
+    st.divider()
+
+    # ── Technical Integration ───────────────────────────────────────────────────
+    st.markdown("#### Technical Integration")
+    st.markdown("""
+- **Platform:** Streamlit — secure, web-based access
+- **File limit:** 200 MB (~two years of standard force plate data)
+- **Compatible systems:** Hawkin Dynamics only (other vendors organise columns differently)
+- **Export:** SWC summary, overall stats, and cleaned raw CSV available on the Summary tab
+- **Direct integration:** Contact N1 Performance Lab for automated data ingestion options
+""")
+
+    st.divider()
+
+    # ── FAQs ───────────────────────────────────────────────────────────────────
+    st.markdown("#### FAQs")
+    faqs = [
+        ("What is Principal Component Analysis?",
+         "PCA is a dimensionality reduction technique that transforms high-dimensional data into a lower-dimensional form while preserving as much variance as possible. It reveals which combinations of metrics best separate your athletes."),
+        ("What is K-Means Clustering?",
+         "K-Means is an unsupervised machine learning algorithm that groups data points based on inherent similarity — no labels required. For example, it might identify 'explosive-power athletes', 'impulse-dominant athletes', and 'strategy-reliant athletes' without being told those categories exist."),
+        ("What exactly am I looking at in the PCA plot?",
+         "Each dot is one athlete. Dots close together share similar force plate profiles. Athletes in the same coloured cluster share characteristics that could inform shared training blocks."),
+        ("How many clusters should I use?",
+         "Start with 3–4 for most teams. The silhouette score (shown in the plot title) quantifies cluster separation — higher is better. Use your coaching eye too: if fast and slow athletes land in the same cluster, try one more cluster."),
+        ("What if my best athlete lands in the 'worst' cluster?",
+         "Clusters are not rankings — they are profiles. Elite athletes sometimes succeed through technique or factors the force plate does not capture. Use the grouping as a discussion point, not a verdict."),
+        ("How much data do I need?",
+         "Minimum 10 athletes; 20+ is better for reliable patterns. For longitudinal analysis, at least 3–4 testing sessions per athlete."),
+        ("If an athlete moves between clusters over time, is that good or bad?",
+         "It depends on your training goals. Moving toward your target performance profile is positive. Use cluster migration to track whether programming is pushing athletes in the intended direction."),
+        ("Can I use data from other force plate systems?",
+         "Currently Hawkin Dynamics only — other systems organise columns differently so uploads will not parse correctly. Contact N1 Performance Lab to discuss expanding compatibility."),
+    ]
+    for q, a in faqs:
+        with st.expander(q):
+            st.markdown(a)
+
+    st.divider()
+
+    # ── References ─────────────────────────────────────────────────────────────
+    st.markdown("#### References")
+    refs = [
+        "Stone, J. D., Merrigan, J. J., Ramadan, J., Brown, R. S., Cheng, G. T., Hornsby, W. G., ... & Hagen, J. A. (2022). Simplifying external load data in NCAA Division-I men's basketball competitions: A principal component analysis. *Frontiers in Sports and Active Living*, 4, 795897.",
+        "Parmar, N., James, N., Hearne, G., & Jones, B. (2018). Using principal component analysis to develop performance indicators in professional rugby league. *International Journal of Performance Analysis in Sport*, 18(6), 938–949.",
+        "Vagner, M., Cleather, D. J., Kubový, P., Hojka, V., & Stastny, P. (2022). Principal component analysis can be used to discriminate between elite and sub-elite kicking performance. *Motor Control*, 27(2), 354–372.",
+        "Bazmara, M., & Jafari, S. (2013). K nearest neighbor algorithm for finding soccer talent. *Journal of Basic and Applied Scientific Research*, 3(4), 981–986.",
+        "Shelly, Z., Burch, R. F., Tian, W., Strawderman, L., Piroli, A., & Bichey, C. (2020). Using K-means clustering to create training groups for elite American football student-athletes based on game demands. *International Journal of Kinesiology and Sports Science*, 8(2), 47–63.",
+        "GeeksforGeeks. (n.d.). K-Means Clustering — Introduction. https://www.geeksforgeeks.org/machine-learning/k-means-clustering-introduction/",
+        "StatQuest with Josh Starmer. (2018). StatQuest: K-means clustering [Video]. YouTube. https://www.youtube.com/watch?v=FgakZw6K1QQ",
+    ]
+    for i, ref in enumerate(refs, 1):
+        st.markdown(f"{i}. {ref}")
+
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown(
     '<p style="font-size:10px;color:#888;text-align:right">'
-    'N1 Performance Lab · Force Plate Dashboard v2 · '
-    'ODS Framework (Lake) · SWC (Hopkins) · PCA (Merrigan)</p>',
+    'N1 Performance Lab · Force Plate Dashboard v3 · '
+    'ODS Framework (Lake) · SWC (Hopkins) · PCA (Merrigan) · '
+    'Compatible with Hawkin Dynamics exports</p>',
     unsafe_allow_html=True
 )
