@@ -9,8 +9,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import os, re
+import os, re, sys
 from datetime import datetime
+
+# Engine import — works both locally and on Streamlit Cloud
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "02_Logic"))
+from n1_predictive_engine import run_pipeline, EngineOutput
 
 st.set_page_config(
     page_title="Squad Readiness · N1",
@@ -165,101 +169,36 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Parse each athlete ─────────────────────────────────────────────────────────
-STATUS_ORDER = {"HIGH LOAD": 0, "MONITOR": 1, "CAUTION": 2, "READY": 3}
+# ── Run integrated engine pipeline ────────────────────────────────────────────
+PRIORITY_ORDER = {
+    "CRITICAL: MANDATORY REST": 0,
+    "MAINTENANCE REQUIRED":     1,
+    "TECHNICAL INTERVENTION":   2,
+    "READY":                    3,
+}
 
-def classify_athlete(row):
-    """Return status, colour, recommendation based on SWC flags in the row."""
-    red_count, amber_count = 0, 0
-    flags = []
-    asym_val = None
-    asym_flag = False
-
-    def check(col, label, higher_is_better=True):
-        nonlocal red_count, amber_count
-        if col is None or col not in row.index: return
-        val, direction = parse_val(row[col])
-        if val is None: return
-        is_bad = (direction == "down") if higher_is_better else (direction == "up")
-        if is_bad:
-            red_count += 1
-            flags.append(f"{label} ▼")
-
-    check(jh_col,   "Jump Height")
-    check(mrsi_col, "mRSI")
-    check(rsi_col,  "RSI")
-    check(tv_col,   "Takeoff Velocity")
-
-    # Asymmetry — absolute threshold
-    if asym_col and asym_col in row.index:
-        val, _ = parse_val(row[asym_col])
-        if val is not None:
-            asym_val = val
-            if abs(val) >= 15:
-                flags.append(f"Asymmetry {val:+.1f}% ⚠")
-                asym_flag = True
-                red_count += 1
-            elif abs(val) >= 10:
-                flags.append(f"Asymmetry {val:+.1f}%")
-                amber_count += 1
-
-    if red_count >= 2 or asym_flag:
-        status = "HIGH LOAD"
-        color  = "#E74C3C"
-    elif red_count == 1 or amber_count >= 2:
-        status = "MONITOR"
-        color  = "#F39C12"
-    elif amber_count >= 1:
-        status = "CAUTION"
-        color  = "#F39C12"
-    else:
-        status = "READY"
-        color  = "#2ECC71"
-
-    # Recommendation
-    if status == "HIGH LOAD":
-        if asym_flag:
-            rec = (f"Asymmetry at {asym_val:+.1f}% — limit deceleration and change-of-direction "
-                   f"tasks. Reduce jump volume. Prioritise recovery.")
-        else:
-            rec = "Multiple output metrics below baseline. Reduce intensity and jump volume. Recovery focus."
-    elif status in ("MONITOR", "CAUTION"):
-        rec = "One or more metrics below baseline. Manage load during session. Reduce intensity if fatigue shows."
-    else:
-        rec = "No significant flags. Available for full training."
-
-    flag_str = " · ".join(flags) if flags else "No flags"
-    return status, color, flag_str, rec, asym_val
-
-cards = []
+engine_outputs: list[EngineOutput] = []
 for _, row in df.iterrows():
     name = str(row[name_col]).strip()
     if not name: continue
-    status, color, flag_str, rec, asym_val = classify_athlete(row)
+    row_dict = row.to_dict()
+    out = run_pipeline(name, row_dict)
+    engine_outputs.append(out)
 
-    jh_val,   jh_dir   = parse_val(row[jh_col])   if jh_col   else (None, "neutral")
-    mrsi_val, mrsi_dir = parse_val(row[mrsi_col])  if mrsi_col else (None, "neutral")
-    tv_val,   tv_dir   = parse_val(row[tv_col])    if tv_col   else (None, "neutral")
-
-    cards.append(dict(name=name, status=status, color=color,
-                      flag_str=flag_str, rec=rec, asym_val=asym_val,
-                      jh=(jh_val, jh_dir), mrsi=(mrsi_val, mrsi_dir),
-                      tv=(tv_val, tv_dir)))
-
-cards.sort(key=lambda x: STATUS_ORDER[x["status"]])
+engine_outputs.sort(key=lambda x: PRIORITY_ORDER[x.harmonized.classification])
 
 # ── Summary counts ─────────────────────────────────────────────────────────────
-counts = {s: sum(1 for c in cards if c["status"] == s)
-          for s in ["HIGH LOAD", "MONITOR", "CAUTION", "READY"]}
-
-cfg = [
-    ("HIGH LOAD", "#E74C3C", "✕ High Load"),
-    ("MONITOR",   "#F39C12", "⚠ Monitor"),
-    ("CAUTION",   "#F39C12", "~ Caution"),
-    ("READY",     "#2ECC71", "✓ Ready"),
+count_cfg = [
+    ("CRITICAL: MANDATORY REST", "#E74C3C", "🚨 Critical"),
+    ("MAINTENANCE REQUIRED",     "#3498DB", "🔧 Maintenance"),
+    ("TECHNICAL INTERVENTION",   "#F39C12", "⚙️ Technical"),
+    ("READY",                    "#2ECC71", "✅ Ready"),
 ]
+counts = {s: sum(1 for o in engine_outputs if o.harmonized.classification == s)
+          for s, _, _ in count_cfg}
+
 cols = st.columns(4)
-for i, (s, hex_c, lbl) in enumerate(cfg):
+for i, (s, hex_c, lbl) in enumerate(count_cfg):
     with cols[i]:
         st.markdown(f"""
         <div class="summary-box" style="--c:{hex_c}">
@@ -273,61 +212,96 @@ st.markdown('<div class="section-label">Individual Status</div>', unsafe_allow_h
 DIR_COLOR = {"up": "#2ECC71", "down": "#E74C3C", "neutral": "#1A1A1A"}
 DIR_ARROW = {"up": "▲", "down": "▼", "neutral": "—"}
 
-for c in cards:
-    border = c["color"]
-    badge_bg = c["color"]
+for out in engine_outputs:
+    h  = out.harmonized
+    f  = out.forensics
+    pr = out.predictive
+    p  = out.profile
+    border = h.color
 
-    # Metric HTML
+    # Key metrics
     metrics_html = ""
-    for label, (val, direction), unit in [
-        ("Jump Height", c["jh"],   " m"),
-        ("mRSI",        c["mrsi"], ""),
-        ("Takeoff Vel", c["tv"],   " m/s"),
+    for label, metric, unit in [
+        ("Jump Height", p.jump_height,      " m"),
+        ("mRSI",        p.mrsi,             ""),
+        ("Takeoff Vel", p.takeoff_velocity,  " m/s"),
     ]:
-        if val is None: continue
-        vc = DIR_COLOR[direction]
-        arrow = DIR_ARROW[direction]
+        if metric is None or metric.value is None: continue
+        vc    = DIR_COLOR[metric.direction]
+        arrow = DIR_ARROW[metric.direction]
+        direction_lbl = "Above" if metric.direction == "up" else "Below" if metric.direction == "down" else "Stable"
         metrics_html += f"""
         <div class="metric-box">
           <div class="metric-label">{label}</div>
-          <div class="metric-value" style="--vc:{vc}">{val}{unit}</div>
-          <div class="metric-flag" style="--vc:{vc}">{arrow} {'Above' if direction=='up' else 'Below' if direction=='down' else 'Stable'}</div>
+          <div class="metric-value" style="--vc:{vc}">{metric.value}{unit}</div>
+          <div class="metric-flag" style="--vc:{vc}">{arrow} {direction_lbl}</div>
         </div>"""
 
     # Asymmetry chip
     asym_html = ""
-    if c["asym_val"] is not None:
-        av = c["asym_val"]
+    if p.lr_braking_imp and p.lr_braking_imp.value is not None:
+        av = p.lr_braking_imp.value
         ac = "#E74C3C" if abs(av) >= 15 else "#F39C12" if abs(av) >= 10 else "#2ECC71"
-        asym_html = f'<div class="asym-chip" style="--ac:{ac}">L|R {av:+.1f}%</div>'
+        asym_html = f'<div class="asym-chip" style="--ac:{ac}">L|R Braking {av:+.1f}%</div>'
 
-    # First name only for display
-    first_name = c["name"].split()[0].title()
-    last_name  = " ".join(c["name"].split()[1:]).title()
+    # Engine badges
+    n1_color   = "#E74C3C" if f.status == "COMPENSATING" else "#2ECC71"
+    pred_color = ("#E74C3C" if pr.risk_level == "HIGH RISK"
+                  else "#F39C12" if pr.risk_level == "MODERATE RISK" else "#2ECC71")
+
+    engine_html = f"""
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;
+                   background:{n1_color}22;color:{n1_color};border:1px solid {n1_color}44">
+        N1: {f.status} ({f.severity})
+      </span>
+      <span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;
+                   background:{pred_color}22;color:{pred_color};border:1px solid {pred_color}44">
+        LOAD: {pr.risk_level} · {pr.probability}%
+      </span>
+    </div>"""
+
+    first_name = out.name.split()[0].title()
+    last_name  = " ".join(out.name.split()[1:]).title()
 
     st.markdown(f"""
     <div class="card" style="--border:{border}">
       <div class="card-top">
         <div class="card-name">{first_name} <span style="font-weight:400;color:#888">{last_name}</span></div>
-        <div class="card-badge" style="--border:{badge_bg}">{c['status']}</div>
+        <div class="card-badge" style="--border:{border}">{h.icon} {h.classification}</div>
       </div>
-      <div style="font-size:11px;color:#999;margin-bottom:6px">{c['flag_str']}</div>
       <div class="metrics-row">{metrics_html}</div>
       {asym_html}
+      {engine_html}
       <div class="rec-box">
-        <div class="rec-label">What this means for today</div>
-        {c['rec']}
+        <div class="rec-label">Action</div>
+        {h.action}
       </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # Expandable detail for coaches who want more
+    with st.expander(f"Why — {first_name} {last_name}"):
+        st.markdown(f"**Harmonizer Rationale**\n\n{h.rationale}")
+        if f.indicators:
+            st.markdown("**Biomechanical Flags (N1 V10)**")
+            for ind in f.indicators:
+                st.markdown(f"- {ind}")
+        st.markdown(f"**Load-Probability Drivers**\n\n{pr.narrative}")
+        if pr.drivers:
+            st.markdown(" · ".join(pr.drivers))
+
 # ── Jump height bar chart ──────────────────────────────────────────────────────
-if any(c["jh"][0] is not None for c in cards):
+jh_data = [(out.name.split()[0].title(), out.profile.jump_height, out.harmonized.color)
+           for out in engine_outputs
+           if out.profile.jump_height and out.profile.jump_height.value is not None]
+
+if jh_data:
     st.markdown('<div class="section-label">Jump Height — Squad Overview</div>',
                 unsafe_allow_html=True)
-    names  = [c["name"].split()[0].title() for c in cards if c["jh"][0] is not None]
-    values = [c["jh"][0] for c in cards if c["jh"][0] is not None]
-    colors = [c["color"] for c in cards if c["jh"][0] is not None]
+    names  = [d[0] for d in jh_data]
+    values = [d[1].value for d in jh_data]
+    colors = [d[2] for d in jh_data]
 
     fig = go.Figure(go.Bar(
         x=names, y=values,
@@ -343,8 +317,7 @@ if any(c["jh"][0] is not None for c in cards):
         yaxis=dict(showgrid=True, gridcolor="#F0F0F0",
                    title="Jump Height (m)", tickfont=dict(size=9),
                    range=[0, max(values) * 1.18]),
-        font=dict(family="Inter"),
-        showlegend=False,
+        font=dict(family="Inter"), showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -353,8 +326,9 @@ st.markdown("""
 <div style="text-align:center;font-size:10px;color:#ccc;margin-top:28px;padding-top:16px;
 border-top:1px solid #EEEEEE">
 N1 Performance Lab · Hawkin Dynamics CMJ · SWC Method (Hopkins)<br>
-🔴 High Load = 2+ flags or asymmetry &gt;15% &nbsp;·&nbsp;
-🟡 Monitor = 1 flag or asymmetry 10–15% &nbsp;·&nbsp;
-🟢 Ready = clear
+🚨 Critical = N1 Compensating + High Load &nbsp;·&nbsp;
+🔧 Maintenance = Stable + High Load &nbsp;·&nbsp;
+⚙️ Technical = Compensating + Low Load &nbsp;·&nbsp;
+✅ Ready = Stable + Low Load
 </div>
 """, unsafe_allow_html=True)
