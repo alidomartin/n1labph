@@ -1025,9 +1025,9 @@ with t5:
                     f"<div style='display:flex;align-items:center;margin-bottom:7px'>"
                     f"<span style='font-size:9px;color:#999;font-weight:700;width:22px'>{_lc}</span>"
                     f"<span style='font-size:10px;font-weight:700;padding:3px 10px;"
-                    f"border:1px solid {'transparent' if not _active else _lcolor};"
+                    f"border:1px solid {_lcolor if _active else '#D0D0D0'};"
                     f"border-radius:3px;"
-                    f"color:{'#FFF' if _active else '#AAAAAA'};"
+                    f"color:{'#FFF' if _active else '#666'};"
                     f"background:{'transparent' if not _active else _lcolor};"
                     f"letter-spacing:.05em'>{_ll}</span>"
                     f"</div>"
@@ -1045,29 +1045,52 @@ with t5:
                 unsafe_allow_html=True,
             )
 
-        _CMJ_TILES = [
-            ("JH",      ["jump height"],                                "cm"),
-            ("PP/BM",   ["peak propulsive power", "pp/bm", "peak power"], "W/kg"),
-            ("FT:CT",   ["ft:ct", "ft/ct", "flight time contraction"],    ""),
-            ("F@0V/BM", ["force at zero velocity", "f@0v", "peak force"], "N/kg"),
-            ("EPV",     ["eccentric peak velocity", "epv", "peak velocity"], "m/s"),
+        def _tile_find(df, keywords):
+            """Column lookup that normalises underscores → spaces for compatibility."""
+            for c in df.columns:
+                if df[c].dtype not in [np.float64, np.int64, np.float32]:
+                    continue
+                c_norm = c.lower().replace('_', ' ')
+                if any(k in c_norm for k in keywords) and df[c].notna().any():
+                    return c
+            return None
+
+        # Priority list — first 5 that find a column are shown
+        _TILE_PRIORITY = [
+            ("Jump Height", ["jump height"],                                          "m"),
+            ("mRSI",        ["mrsi", "rsi mod", "modified rsi"],                      ""),
+            ("RSI",         ["rsi"],                                                   ""),
+            ("Braking RFD", ["braking rfd"],                                          "N/s"),
+            ("Takeoff Vel", ["takeoff velocity"],                                     "m/s"),
+            ("Impulse Ratio",["impulse ratio"],                                       ""),
+            ("Flight Time", ["flight time"],                                          "s"),
+            ("Peak Power",  ["peak propulsive power", "peak prop power", "peak power"], "W"),
+            ("FT:CT",       ["ft:ct", "ft/ct"],                                       ""),
         ]
-        _tcols = st.columns(len(_CMJ_TILES))
-        for _ti, (_tlabel, _tkws, _tunit) in enumerate(_CMJ_TILES):
-            _tcol = cv_find(fdf, _tkws)
-            _tval = latest_metric(adf, _tcol) if _tcol else None
-            _tvstr = f"{_tval:.3f}" if _tval is not None else "—"
-            with _tcols[_ti]:
-                st.markdown(
-                    f"<div style='text-align:center;padding:14px 6px;background:#F8F8F8;"
-                    f"border-radius:4px;border-top:2px solid #1A1A1A;margin-bottom:16px'>"
-                    f"<div style='font-size:22px;font-weight:700;letter-spacing:-.02em'>{_tvstr}</div>"
-                    f"<div style='font-size:9px;color:#888;font-weight:700;letter-spacing:.12em;"
-                    f"text-transform:uppercase;margin-top:3px'>{_tlabel}</div>"
-                    f"<div style='font-size:8px;color:#bbb;margin-top:1px'>{_tunit}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+        _tiles_found = []
+        for _tl, _tkws, _tu in _TILE_PRIORITY:
+            _tc = _tile_find(fdf, _tkws)
+            if _tc:
+                _tv = latest_metric(adf, _tc)
+                _tiles_found.append((_tl, _tv, _tu))
+            if len(_tiles_found) == 5:
+                break
+
+        if _tiles_found:
+            _tcols = st.columns(len(_tiles_found))
+            for _ti, (_tlabel, _tval, _tunit) in enumerate(_tiles_found):
+                _tvstr = f"{_tval:.3f}" if _tval is not None and not np.isnan(_tval) else "—"
+                with _tcols[_ti]:
+                    st.markdown(
+                        f"<div style='text-align:center;padding:14px 6px;background:#F8F8F8;"
+                        f"border-radius:4px;border-top:2px solid #1A1A1A;margin-bottom:16px'>"
+                        f"<div style='font-size:22px;font-weight:700;letter-spacing:-.02em'>{_tvstr}</div>"
+                        f"<div style='font-size:9px;color:#888;font-weight:700;letter-spacing:.12em;"
+                        f"text-transform:uppercase;margin-top:3px'>{_tlabel}</div>"
+                        f"<div style='font-size:8px;color:#bbb;margin-top:1px'>{_tunit}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
 
         # ── CMJ PHASE & SYMMETRY ANALYSIS ─────────────────────────────────────
         import re as _re
