@@ -911,6 +911,359 @@ with t5:
         adf = fdf[fdf["Name"]==sel_athlete].sort_values("Date")
         st.markdown(f"#### {sel_athlete} — Individual Report")
 
+        # ── CMJ CLASSIFICATION CARD ────────────────────────────────────────────
+        st.markdown("##### CMJ Classification")
+
+        _CMJ_DIMS = {
+            "Performance": ["jump height", "mrsi", "rsi", "flight time"],
+            "Propulsive":  ["propulsive net", "takeoff velocity", "propulsive impulse", "peak propulsive"],
+            "Braking":     ["braking rfd", "braking impulse", "braking net", "peak braking"],
+            "Strategy":    ["contraction time", "countermovement depth", "depth"],
+            "Landing":     ["landing rfd", "peak landing", "landing impulse"],
+        }
+        _dim_scores = {}
+        for _dim, _kws in _CMJ_DIMS.items():
+            _col = cv_find(fdf, _kws)
+            if _col:
+                _sq  = fdf[_col].dropna()
+                _ath = adf[_col].dropna()
+                _dim_scores[_dim] = (percentile_rank(_ath.iloc[-1], _sq)
+                                     if not _ath.empty and len(_sq) > 1 else 50.0)
+            else:
+                _dim_scores[_dim] = 50.0
+
+        _perf  = _dim_scores["Performance"]
+        _prop  = _dim_scores["Propulsive"]
+        _brak  = _dim_scores["Braking"]
+        _strat = _dim_scores["Strategy"]
+        _asym_v = latest_metric(adf, asym_col)
+
+        if _perf < 30 and _prop < 30:
+            _class = "SUPPRESSED"
+        elif _strat > 65 and _perf < 45:
+            _class = "GRINDER"
+        elif _brak >= 50 and _prop < 40:
+            _class = "PERFORMANCE (POWER DEFICIT)"
+        elif _asym_v is not None and abs(_asym_v) >= 15:
+            _class = "INVESTIGATE"
+        else:
+            _class = "PERFORMANCE"
+
+        _strongest = max(_dim_scores, key=_dim_scores.get)
+        _weakest   = min(_dim_scores, key=_dim_scores.get)
+
+        _rsi_c = mrsi_col or rsi_col
+        if _rsi_c and _rsi_c in adf.columns:
+            _rv = adf[_rsi_c].dropna()
+            if not _rv.empty:
+                _rp = percentile_rank(_rv.iloc[-1], fdf[_rsi_c].dropna())
+                _plyo = ("Stage 5 — Elite" if _rp >= 90 else
+                         "Stage 4"         if _rp >= 70 else
+                         "Stage 3"         if _rp >= 50 else
+                         "Stage 2"         if _rp >= 30 else "Stage 1")
+            else:
+                _plyo = "—"
+        else:
+            _plyo = "—"
+
+        _ct_c = cv_find(fdf, ["contraction time", "ct "])
+        if _ct_c and _ct_c in adf.columns:
+            _ctv = adf[_ct_c].dropna()
+            _ssc = ("Fast SSC"
+                    if not _ctv.empty and percentile_rank(_ctv.iloc[-1], fdf[_ct_c].dropna()) < 40
+                    else "Slow SSC")
+        else:
+            _ssc = "—"
+
+        _cc1, _cc2 = st.columns([1, 1])
+        with _cc1:
+            _dim_keys = list(_CMJ_DIMS.keys())
+            _theta = _dim_keys + [_dim_keys[0]]
+            _r     = [_dim_scores[d] for d in _dim_keys] + [_dim_scores[_dim_keys[0]]]
+            _fig_p = go.Figure(go.Scatterpolar(
+                r=_r, theta=_theta, fill="toself",
+                fillcolor="rgba(26,26,26,0.10)",
+                line=dict(color="#1A1A1A", width=2),
+                marker=dict(size=6, color="#1A1A1A"),
+                hovertemplate="%{theta}: <b>%{r:.0f}th pct</b><extra></extra>",
+            ))
+            _fig_p.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, 100],
+                                   tickfont=dict(size=7), gridcolor="#E8E8E8",
+                                   tickvals=[25, 50, 75, 100]),
+                    angularaxis=dict(tickfont=dict(size=10, family="Inter")),
+                    bgcolor="#FFFFFF",
+                ),
+                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+                height=280, margin=dict(l=20, r=20, t=10, b=10),
+                font=dict(family="Inter"), showlegend=False,
+            )
+            st.plotly_chart(_fig_p, use_container_width=True)
+
+        with _cc2:
+            _is_clean = (_class == "PERFORMANCE")
+            _clean_html = (
+                f"<div style='margin-bottom:10px'>"
+                f"<span style='font-size:10px;font-weight:700;padding:4px 12px;"
+                f"background:{'#2ECC71' if _is_clean else 'transparent'};"
+                f"color:{'#FFF' if _is_clean else '#AAAAAA'};"
+                f"border:1px solid {'#2ECC71' if _is_clean else '#E8E8E8'};"
+                f"border-radius:3px;letter-spacing:.06em'>PERFORMANCE</span>"
+                f"</div>"
+            )
+            _L_LABELS = [
+                ("L1", "SUPPRESSED",               "#E74C3C"),
+                ("L2", "GRINDER",                   "#F39C12"),
+                ("L3", "PERFORMANCE (POWER DEFICIT)","#F39C12"),
+                ("L4", "INVESTIGATE",               "#9B59B6"),
+            ]
+            _lhtml = ""
+            for _lc, _ll, _lcolor in _L_LABELS:
+                _active = (_class == _ll)
+                _lhtml += (
+                    f"<div style='display:flex;align-items:center;margin-bottom:7px'>"
+                    f"<span style='font-size:9px;color:#999;font-weight:700;width:22px'>{_lc}</span>"
+                    f"<span style='font-size:10px;font-weight:700;padding:3px 10px;"
+                    f"border:1px solid {'transparent' if not _active else _lcolor};"
+                    f"border-radius:3px;"
+                    f"color:{'#FFF' if _active else '#AAAAAA'};"
+                    f"background:{'transparent' if not _active else _lcolor};"
+                    f"letter-spacing:.05em'>{_ll}</span>"
+                    f"</div>"
+                )
+            st.markdown(
+                f"<div style='padding:12px 8px'>"
+                f"{_clean_html}{_lhtml}"
+                f"<div style='margin-top:14px;font-size:11px;color:#555'>"
+                f"<b style='color:#1A1A1A'>Plyo:</b> {_plyo} &nbsp;·&nbsp; {_ssc}</div>"
+                f"<div style='margin-top:6px;font-size:11px'>"
+                f"<span style='color:#2ECC71;font-weight:700'>Strongest:</span> {_strongest}"
+                f" &nbsp;·&nbsp; "
+                f"<span style='color:#E74C3C;font-weight:700'>Weakest:</span> {_weakest}"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+        _CMJ_TILES = [
+            ("JH",      ["jump height"],                                "cm"),
+            ("PP/BM",   ["peak propulsive power", "pp/bm", "peak power"], "W/kg"),
+            ("FT:CT",   ["ft:ct", "ft/ct", "flight time contraction"],    ""),
+            ("F@0V/BM", ["force at zero velocity", "f@0v", "peak force"], "N/kg"),
+            ("EPV",     ["eccentric peak velocity", "epv", "peak velocity"], "m/s"),
+        ]
+        _tcols = st.columns(len(_CMJ_TILES))
+        for _ti, (_tlabel, _tkws, _tunit) in enumerate(_CMJ_TILES):
+            _tcol = cv_find(fdf, _tkws)
+            _tval = latest_metric(adf, _tcol) if _tcol else None
+            _tvstr = f"{_tval:.3f}" if _tval is not None else "—"
+            with _tcols[_ti]:
+                st.markdown(
+                    f"<div style='text-align:center;padding:14px 6px;background:#F8F8F8;"
+                    f"border-radius:4px;border-top:2px solid #1A1A1A;margin-bottom:16px'>"
+                    f"<div style='font-size:22px;font-weight:700;letter-spacing:-.02em'>{_tvstr}</div>"
+                    f"<div style='font-size:9px;color:#888;font-weight:700;letter-spacing:.12em;"
+                    f"text-transform:uppercase;margin-top:3px'>{_tlabel}</div>"
+                    f"<div style='font-size:8px;color:#bbb;margin-top:1px'>{_tunit}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+        # ── CMJ PHASE & SYMMETRY ANALYSIS ─────────────────────────────────────
+        import re as _re
+        _TRACES_DIR = os.path.join(os.path.dirname(__file__), "../01_Raw_Data/Traces")
+
+        def _find_traces(athlete_name, traces_dir):
+            if not os.path.isdir(traces_dir):
+                return []
+            _key = athlete_name.lower().replace(' ', '').replace('_', '')
+            _out = []
+            for _f in sorted(os.listdir(traces_dir)):
+                if not _f.lower().endswith('.csv'):
+                    continue
+                _m = _re.match(r'Force-(.+?)_Countermovement', _f, _re.IGNORECASE)
+                if not _m:
+                    continue
+                _fkey = _m.group(1).replace('__', '').replace('_', '').lower()
+                if _fkey == _key or _key in _fkey or _fkey in _key:
+                    _out.append(os.path.join(traces_dir, _f))
+            return _out
+
+        _trace_files = _find_traces(sel_athlete, _TRACES_DIR)
+
+        if _trace_files:
+            st.markdown("##### CMJ Phase Analysis")
+            if len(_trace_files) > 1:
+                _sel_trace = st.selectbox(
+                    "Trial", [os.path.basename(f) for f in _trace_files], key="trace_sel"
+                )
+                _trace_path = next(f for f in _trace_files if os.path.basename(f) == _sel_trace)
+            else:
+                _trace_path = _trace_files[0]
+
+            try:
+                _tr = pd.read_csv(_trace_path)
+                _tr.columns = [c.strip().strip('"') for c in _tr.columns]
+                _t        = _tr["Time (s)"].values.astype(float)
+                _left     = _tr["Left (N)"].values.astype(float)
+                _right    = _tr["Right (N)"].values.astype(float)
+                _combined = _tr["Combined (N)"].values.astype(float)
+                _dt       = _t[1] - _t[0]
+
+                # Body weight from first 0.5 s quiet stance
+                _quiet_n = max(int(0.5 / _dt), 10)
+                _bw      = _combined[:_quiet_n].mean()
+                _mass    = _bw / 9.81
+
+                # Net force and velocity (integration)
+                _f_net    = _combined - _bw
+                _velocity = np.cumsum(_f_net * _dt) / _mass
+
+                # Phase detection
+                _thresh      = _bw * 0.03
+                _move_start  = _quiet_n
+                for _i in range(_quiet_n, len(_combined) - 10):
+                    if np.all(_combined[_i:_i + 5] < _bw - _thresh):
+                        _move_start = _i
+                        break
+
+                _braking_start = _move_start
+                _in_dip        = False
+                for _i in range(_move_start, len(_combined)):
+                    if _combined[_i] < _bw:
+                        _in_dip = True
+                    if _in_dip and _combined[_i] >= _bw:
+                        _braking_start = _i
+                        break
+
+                _search_end = min(_braking_start + int(0.5 / _dt), len(_velocity))
+                _prop_start = int(np.argmin(_velocity[_braking_start:_search_end])) + _braking_start
+
+                _takeoff = len(_combined) - 1
+                for _i in range(_prop_start, len(_combined)):
+                    if _combined[_i] < _bw * 0.05:
+                        _takeoff = _i
+                        break
+
+                _t_rel = _t - _t[_move_start]
+
+                _ph1, _ph2 = st.columns(2)
+
+                # ── Phase chart ───────────────────────────────────────────────
+                with _ph1:
+                    _fig_phase = go.Figure()
+                    _phase_defs = [
+                        (_t_rel[_move_start],    _t_rel[_braking_start], "rgba(180,140,60,0.22)", "Unweighting"),
+                        (_t_rel[_braking_start], _t_rel[_prop_start],    "rgba(100,110,70,0.22)", "Braking ↓"),
+                        (_t_rel[_prop_start],    _t_rel[_takeoff],       "rgba(40,100,70,0.28)",  "Propulsion ↑"),
+                    ]
+                    for _x0, _x1, _fc, _lbl in _phase_defs:
+                        _fig_phase.add_vrect(
+                            x0=_x0, x1=_x1, fillcolor=_fc, line_width=0,
+                            annotation_text=_lbl, annotation_position="top left",
+                            annotation_font_size=8, annotation_font_color="#555",
+                        )
+                    for _xi in [_t_rel[_braking_start], _t_rel[_prop_start], _t_rel[_takeoff]]:
+                        _fig_phase.add_vline(x=_xi, line_dash="dot", line_color="#ccc", line_width=1)
+                    _fig_phase.add_hline(y=0, line_dash="dot", line_color="#ddd", line_width=1)
+                    _fig_phase.add_trace(go.Scatter(
+                        x=_t_rel, y=_f_net,
+                        name="Net Force",
+                        line=dict(color="#1A1A1A", width=2),
+                        hovertemplate="t=%{x:.3f}s<br>F_net=%{y:.1f} N<extra></extra>",
+                    ))
+                    _fig_phase.add_trace(go.Scatter(
+                        x=_t_rel, y=_velocity,
+                        name="Velocity",
+                        yaxis="y2",
+                        line=dict(color="#E74C3C", width=1.5, dash="dot"),
+                        hovertemplate="t=%{x:.3f}s<br>v=%{y:.2f} m/s<extra></extra>",
+                    ))
+                    _fig_phase.update_layout(
+                        title=dict(text=f"CMJ phases — {os.path.basename(_trace_path).split('_Countermovement')[0].replace('Force-','').replace('_',' ').replace('  ',' ').strip()}",
+                                   font=dict(size=11, family="Inter")),
+                        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+                        xaxis=dict(title="Time relative to start of movement (s)",
+                                   showgrid=False, tickfont=dict(size=9)),
+                        yaxis=dict(title="Net Force (N)", showgrid=True,
+                                   gridcolor="#F0F0F0", tickfont=dict(size=9),
+                                   zeroline=True, zerolinecolor="#ddd"),
+                        yaxis2=dict(title="Velocity (m/s)", overlaying="y", side="right",
+                                    showgrid=False, tickfont=dict(size=9)),
+                        height=320, margin=dict(l=8, r=8, t=44, b=8),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.28,
+                                    font=dict(size=9)),
+                        font=dict(family="Inter"),
+                    )
+                    st.plotly_chart(_fig_phase, use_container_width=True)
+
+                # ── L vs R symmetry chart ─────────────────────────────────────
+                with _ph2:
+                    _disp     = np.cumsum(_velocity * _dt)
+                    _max_dep  = abs(_disp[_prop_start]) if _disp[_prop_start] != 0 else 1.0
+                    _disp_pct = (_disp / _max_dep) * 100
+                    _sl       = slice(_move_start, _takeoff)
+
+                    _brak_sl = slice(_braking_start, _prop_start)
+                    _lm = _left[_brak_sl].mean()  if _prop_start > _braking_start else 0.0
+                    _rm = _right[_brak_sl].mean() if _prop_start > _braking_start else 0.0
+                    _sym_denom = (_lm + _rm) / 2
+                    _asym_pct  = (_rm - _lm) / _sym_denom * 100 if _sym_denom > 0 else 0.0
+                    _dom_leg   = "right" if _asym_pct > 0 else "left"
+                    _asym_dot  = ("#E74C3C" if abs(_asym_pct) >= 15 else
+                                  "#F39C12" if abs(_asym_pct) >= 10 else "#2ECC71")
+                    _asym_txt  = (
+                        f"Mild asymmetry — {_dom_leg} leg is producing {abs(_asym_pct):.1f}% more force during loading"
+                        if abs(_asym_pct) >= 5
+                        else "Symmetrical loading — bilateral force production balanced"
+                    )
+
+                    _fig_sym = go.Figure()
+                    _fig_sym.add_trace(go.Scatter(
+                        x=_disp_pct[_sl], y=_left[_sl],
+                        name="Left",
+                        line=dict(color="#3498DB", width=2),
+                        hovertemplate="disp=%{x:.1f}%<br>Left=%{y:.0f} N<extra></extra>",
+                    ))
+                    _fig_sym.add_trace(go.Scatter(
+                        x=_disp_pct[_sl], y=_right[_sl],
+                        name="Right",
+                        line=dict(color="#E74C3C", width=2),
+                        hovertemplate="disp=%{x:.1f}%<br>Right=%{y:.0f} N<extra></extra>",
+                    ))
+                    _fig_sym.update_layout(
+                        title=dict(text="How symmetrical is the movement?",
+                                   font=dict(size=11, family="Inter")),
+                        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+                        xaxis=dict(title="Normalized displacement (%)",
+                                   showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9)),
+                        yaxis=dict(title="Force (N)", showgrid=True,
+                                   gridcolor="#F0F0F0", tickfont=dict(size=9)),
+                        height=320, margin=dict(l=8, r=8, t=44, b=8),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.28,
+                                    font=dict(size=9)),
+                        font=dict(family="Inter"),
+                    )
+                    st.plotly_chart(_fig_sym, use_container_width=True)
+                    st.markdown(
+                        f"<p style='font-size:11px;color:#555;margin-top:-8px'>"
+                        f"<span style='color:{_asym_dot};font-size:14px'>●</span> "
+                        f"{_asym_txt}</p>",
+                        unsafe_allow_html=True,
+                    )
+
+            except Exception as _trace_err:
+                st.warning(f"Could not process trace file: {_trace_err}")
+        else:
+            st.markdown(
+                "<p style='font-size:11px;color:#aaa;padding:4px 0'>"
+                "Phase analysis unavailable — no trace file found for this athlete. "
+                "Upload force trace CSVs to <code>01_Raw_Data/Traces/</code>.</p>",
+                unsafe_allow_html=True,
+            )
+
+        st.divider()
+
         # KPI row
         kpi_mets = [m for m in (OUTPUT_M + DRIVER_M) if m in adf.columns][:6]
         if not kpi_mets:
