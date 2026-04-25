@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Braking for a Living — N1 Performance Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --slate:       #2C3E50;
+    --slate-deep:  #1a2530;
+    --slate-mid:   #3a5068;
+    --slate-muted: #4A6278;
+    --eucalyptus:  #77DD77;
+    --eucalyptus-dk: #4FA84F;
+    --white:       #F5F5F5;
+    --warm:        #F8F6F1;
+    --ink:         #1A1A1A;
+    --grey:        #888888;
+    --coral:       #C05C52;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-head:   'Space Grotesk', sans-serif;
+    --font-body:   'Inter', sans-serif;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--slate-deep);
+  }
+
+  #magazine {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #magazine::-webkit-scrollbar { display: none; }
+
+  .page {
+    flex-shrink: 0;
+    width: 100vw;
+    height: 100vh;
+    scroll-snap-align: start;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* NAV DOTS */
+  #nav-dots {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 1000;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(245,245,245,0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .dot.active {
+    background: var(--eucalyptus);
+    width: 22px;
+    border-radius: 3px;
+  }
+
+  /* ARROW NAV */
+  .arrow-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 900;
+    background: rgba(245,245,245,0.08);
+    border: 1px solid rgba(245,245,245,0.15);
+    color: var(--white);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 18px;
+    user-select: none;
+    backdrop-filter: blur(4px);
+  }
+  .arrow-nav:hover { background: rgba(119,221,119,0.2); border-color: var(--eucalyptus); }
+  #arrow-left  { left: 20px; }
+  #arrow-right { right: 20px; }
+  .arrow-nav.hidden { opacity: 0; pointer-events: none; }
+
+  /* PAGE LABEL */
+  .page-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ── PAGE 1 — COVER ── */
+  #p1 {
+    background: var(--slate);
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 52px 64px;
+  }
+  #p1 .p1-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  #p1 .p1-issue {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+  }
+  #p1 .p1-num {
+    font-family: var(--font-display);
+    font-size: 120px;
+    color: rgba(245,245,245,0.06);
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+  #p1 .p1-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #p1 .p1-pre {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.3em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  #p1 .p1-title-line {
+    font-family: var(--font-display);
+    font-size: clamp(100px, 14vw, 190px);
+    line-height: 0.88;
+    color: var(--white);
+    letter-spacing: 2px;
+  }
+  #p1 .p1-title-accent {
+    font-family: var(--font-display);
+    font-size: clamp(100px, 14vw, 190px);
+    line-height: 0.88;
+    color: var(--eucalyptus);
+    letter-spacing: 2px;
+  }
+  #p1 .p1-rule {
+    width: 80px;
+    height: 2px;
+    background: var(--eucalyptus);
+    margin: 28px 0;
+  }
+  #p1 .p1-sub {
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    color: rgba(245,245,245,0.55);
+    text-transform: uppercase;
+  }
+  #p1 .p1-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  #p1 .p1-brand {
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--white);
+    text-transform: uppercase;
+  }
+  #p1 .p1-brand span { color: var(--eucalyptus); }
+  #p1 .p1-meta {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: rgba(245,245,245,0.3);
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.8;
+  }
+  #p1 .p1-athletes {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: rgba(119,221,119,0.6);
+    text-transform: uppercase;
+    margin-top: 20px;
+  }
+
+  /* ── PAGE 2 — THE QUESTION ── */
+  #p2 { background: var(--slate); }
+  #p2 .p2-left {
+    width: 52%;
+    height: 100%;
+    background: var(--slate);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 56px;
+    position: relative;
+  }
+  #p2 .p2-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  #p2 .p2-q {
+    font-family: var(--font-display);
+    font-size: clamp(64px, 7.5vw, 108px);
+    line-height: 0.9;
+    letter-spacing: 1px;
+  }
+  #p2 .p2-q.white  { color: var(--white); }
+  #p2 .p2-q.green  { color: var(--eucalyptus); }
+  #p2 .p2-right {
+    width: 48%;
+    height: 100%;
+    background: var(--warm);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 56px 64px 52px;
+  }
+  #p2 .p2-stat-row {
+    margin-bottom: 36px;
+    padding-bottom: 36px;
+    border-bottom: 1px solid rgba(26,26,26,0.12);
+  }
+  #p2 .p2-stat-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  #p2 .p2-stat-num {
+    font-family: var(--font-display);
+    font-size: 60px;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  #p2 .p2-stat-num.coral { color: var(--coral); }
+  #p2 .p2-stat-label {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--grey);
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+  }
+  #p2 .p2-source {
+    margin-top: 32px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(26,26,26,0.35);
+    text-transform: uppercase;
+  }
+
+  /* ── PAGE 3 — THE METRIC ── */
+  #p3 {
+    background: var(--ink);
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 52px 0 52px 0;
+    overflow: hidden;
+  }
+  #p3 .p3-top { padding: 0 64px; }
+  #p3 .p3-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: var(--slate-muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  #p3 .p3-title {
+    font-family: var(--font-display);
+    font-size: clamp(80px, 11vw, 155px);
+    color: var(--white);
+    line-height: 0.85;
+    letter-spacing: 2px;
+  }
+  #p3 .p3-title-accent { color: var(--eucalyptus); }
+  #p3 .p3-pull {
+    background: var(--eucalyptus);
+    padding: 28px 64px;
+    margin: 32px 0;
+  }
+  #p3 .p3-pull-text {
+    font-family: var(--font-display);
+    font-size: clamp(24px, 2.8vw, 42px);
+    color: var(--ink);
+    letter-spacing: 1px;
+    line-height: 1.1;
+  }
+  #p3 .p3-bottom {
+    padding: 0 64px;
+    display: flex;
+    gap: 64px;
+  }
+  #p3 .p3-def { flex: 1; }
+  #p3 .p3-def-head {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  #p3 .p3-def-body {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(245,245,245,0.65);
+    line-height: 1.75;
+  }
+
+  /* ── PAGE 4 — THE NUMBERS ── */
+  #p4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .num-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px 52px;
+    position: relative;
+    overflow: hidden;
+  }
+  .num-cell-label {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .num-cell-date {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.5;
+  }
+  .num-cell-stat {
+    font-family: var(--font-display);
+    font-size: clamp(80px, 10vw, 130px);
+    line-height: 0.85;
+    letter-spacing: 1px;
+  }
+  .num-cell-unit {
+    font-family: var(--font-head);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    margin-top: 8px;
+    opacity: 0.6;
+  }
+  .num-cell-sub {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 300;
+    margin-top: 12px;
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+  }
+  .nc1 { background: var(--warm); color: var(--ink); }
+  .nc1 .num-cell-label { color: var(--grey); }
+  .nc1 .num-cell-stat  { color: var(--ink); }
+  .nc2 { background: #e8f7e8; color: var(--ink); }
+  .nc2 .num-cell-label { color: var(--eucalyptus-dk); }
+  .nc2 .num-cell-stat  { color: var(--eucalyptus-dk); }
+  .nc3 { background: var(--slate-muted); color: var(--white); }
+  .nc3 .num-cell-label { color: rgba(245,245,245,0.55); }
+  .nc3 .num-cell-stat  { color: var(--white); }
+  .nc4 { background: var(--slate); color: var(--eucalyptus); }
+  .nc4 .num-cell-label { color: rgba(119,221,119,0.6); }
+  .nc4 .num-cell-stat  { color: var(--eucalyptus); }
+  .nc4 .num-cell-unit  { color: rgba(119,221,119,0.6); }
+  .nc1, .nc2 { border-bottom: 1px solid rgba(26,26,26,0.08); }
+  .nc1, .nc3 { border-right:  1px solid rgba(26,26,26,0.08); }
+
+  /* ── PAGE 5 — THE DELTA ── */
+  #p5 .p5-left {
+    width: 50%;
+    height: 100%;
+    background: var(--slate);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 56px;
+    position: relative;
+    border-right: 3px solid var(--eucalyptus);
+  }
+  #p5 .p5-right {
+    width: 50%;
+    height: 100%;
+    background: var(--eucalyptus);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 56px;
+    position: relative;
+  }
+  .p5-athlete {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .p5-pos {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .p5-delta {
+    font-family: var(--font-display);
+    font-size: clamp(100px, 13vw, 180px);
+    line-height: 0.85;
+    letter-spacing: -1px;
+  }
+  .p5-arrow {
+    font-family: var(--font-head);
+    font-size: 18px;
+    font-weight: 300;
+    margin: 20px 0 6px;
+    letter-spacing: 0.15em;
+  }
+  .p5-from-to {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+  }
+  .p5-note {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 300;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    letter-spacing: 0.03em;
+    line-height: 1.6;
+  }
+  #p5 .p5-left .p5-athlete  { color: var(--eucalyptus); }
+  #p5 .p5-left .p5-pos      { color: rgba(245,245,245,0.35); }
+  #p5 .p5-left .p5-delta    { color: var(--white); }
+  #p5 .p5-left .p5-arrow    { color: rgba(245,245,245,0.4); }
+  #p5 .p5-left .p5-from-to  { color: rgba(245,245,245,0.55); }
+  #p5 .p5-left .p5-note     { color: rgba(245,245,245,0.4); border-color: rgba(119,221,119,0.2); }
+  #p5 .p5-right .p5-athlete { color: var(--slate); }
+  #p5 .p5-right .p5-pos     { color: rgba(44,62,80,0.5); }
+  #p5 .p5-right .p5-delta   { color: var(--ink); }
+  #p5 .p5-right .p5-arrow   { color: rgba(44,62,80,0.5); }
+  #p5 .p5-right .p5-from-to { color: rgba(44,62,80,0.7); }
+  #p5 .p5-right .p5-note    { color: rgba(44,62,80,0.55); border-color: rgba(44,62,80,0.2); }
+
+  /* ── PAGE 6 — SIGNAL GRID ── */
+  #p6 {
+    background: var(--white);
+    flex-direction: column;
+    padding: 52px 64px 72px;
+  }
+  #p6 .p6-header { margin-bottom: 36px; }
+  #p6 .p6-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: var(--grey);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  #p6 .p6-title {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 5vw, 68px);
+    color: var(--ink);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  #p6 .p6-date {
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--grey);
+    letter-spacing: 0.15em;
+    margin-top: 6px;
+  }
+  #p6 .p6-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    flex: 1;
+  }
+  .sig-tile {
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 22px;
+  }
+  .sig-tile-metric {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .sig-tile-athlete {
+    font-family: var(--font-head);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .sig-tile-val {
+    font-family: var(--font-display);
+    font-size: 38px;
+    line-height: 1;
+    letter-spacing: 0.5px;
+  }
+  .sig-tile-signal {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .sig-green { background: #d4efda; color: #1a5c2a; }
+  .sig-green .sig-tile-signal { color: #1a5c2a; }
+  .sig-amber { background: #f7ecd0; color: #7a5000; }
+  .sig-amber .sig-tile-signal { color: #7a5000; }
+  .sig-red   { background: #f7d8d6; color: #7a1a14; }
+  .sig-red .sig-tile-signal   { color: #7a1a14; }
+
+  /* ── PAGE 7 — THE PATTERN ── */
+  #p7 .p7-left {
+    width: 50%;
+    height: 100%;
+    background: var(--slate);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 52px 64px 64px;
+  }
+  #p7 .p7-right {
+    width: 50%;
+    height: 100%;
+    background: var(--slate-mid);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 64px 64px 52px;
+    border-left: 3px solid rgba(119,221,119,0.3);
+  }
+  .p7-kicker {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .p7-head1 {
+    font-family: var(--font-display);
+    font-size: clamp(52px, 6.5vw, 88px);
+    color: var(--white);
+    line-height: 0.9;
+    letter-spacing: 1px;
+  }
+  .p7-head2 {
+    font-family: var(--font-display);
+    font-size: clamp(52px, 6.5vw, 88px);
+    color: var(--eucalyptus);
+    line-height: 0.9;
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+  }
+  #p7 .p7-right .p7-head2 { color: rgba(245,245,245,0.7); }
+  .p7-body {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(245,245,245,0.6);
+    line-height: 1.75;
+  }
+  .p7-metric-tag {
+    display: inline-block;
+    margin-top: 20px;
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 1px solid rgba(119,221,119,0.35);
+    color: var(--eucalyptus);
+    border-radius: 2px;
+    margin-right: 6px;
+  }
+
+  /* ── PAGE 8 — READINESS VERDICT ── */
+  #p8 .p8-left {
+    width: 55%;
+    height: 100%;
+    background: var(--ink);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 56px;
+    position: relative;
+    overflow: hidden;
+  }
+  #p8 .p8-bg-text {
+    position: absolute;
+    bottom: -40px;
+    left: -20px;
+    font-family: var(--font-display);
+    font-size: 280px;
+    color: rgba(245,245,245,0.025);
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    letter-spacing: -4px;
+  }
+  #p8 .p8-verdict-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    color: var(--slate-muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
+  }
+  #p8 .p8-v1 {
+    font-family: var(--font-display);
+    font-size: clamp(56px, 7vw, 96px);
+    color: var(--white);
+    line-height: 0.88;
+    letter-spacing: 2px;
+    position: relative;
+    z-index: 2;
+  }
+  #p8 .p8-v2 {
+    font-family: var(--font-display);
+    font-size: clamp(56px, 7vw, 96px);
+    color: var(--eucalyptus);
+    line-height: 0.88;
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+    position: relative;
+    z-index: 2;
+  }
+  #p8 .p8-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(119,221,119,0.12);
+    border: 1px solid rgba(119,221,119,0.3);
+    border-radius: 2px;
+    padding: 8px 18px;
+    position: relative;
+    z-index: 2;
+    margin-bottom: 12px;
+  }
+  #p8 .p8-status.coral-status {
+    background: rgba(192,92,82,0.1);
+    border-color: rgba(192,92,82,0.3);
+  }
+  #p8 .p8-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--eucalyptus); }
+  #p8 .p8-dot.coral-dot { background: var(--coral); }
+  #p8 .p8-status-text {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+  }
+  #p8 .p8-status-text.coral-text { color: var(--coral); }
+  #p8 .p8-right {
+    width: 45%;
+    height: 100%;
+    background: var(--warm);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 64px 52px;
+  }
+  #p8 .p8-watch-label {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--grey);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(26,26,26,0.1);
+  }
+  .p8-watch-item {
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(26,26,26,0.08);
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .p8-watch-num {
+    font-family: var(--font-display);
+    font-size: 32px;
+    color: rgba(26,26,26,0.15);
+    line-height: 1;
+    flex-shrink: 0;
+    width: 32px;
+  }
+  .p8-watch-text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.6;
+  }
+  .p8-watch-text strong { font-weight: 600; display: block; margin-bottom: 2px; }
+
+  /* ── PAGE 9 — WHAT COMES NEXT ── */
+  #p9 {
+    background: var(--white);
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 52px 0 52px 0;
+    overflow: hidden;
+  }
+  #p9 .p9-top {
+    padding: 0 64px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  #p9 .p9-kicker {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--grey);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  #p9 .p9-title {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 6vw, 82px);
+    color: var(--ink);
+    line-height: 0.9;
+    letter-spacing: 1px;
+  }
+  #p9 .p9-num {
+    font-family: var(--font-display);
+    font-size: 180px;
+    color: rgba(26,26,26,0.04);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  #p9 .p9-body {
+    background: var(--slate);
+    margin: 0;
+    padding: 44px 64px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 80px;
+  }
+  #p9 .p9-pull {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 3.8vw, 52px);
+    color: var(--white);
+    line-height: 1.05;
+    letter-spacing: 0.5px;
+    flex: 1.2;
+  }
+  #p9 .p9-pull em { color: var(--eucalyptus); font-style: normal; }
+  #p9 .p9-detail {
+    flex: 1;
+    border-left: 2px solid rgba(119,221,119,0.2);
+    padding-left: 48px;
+  }
+  .p9-detail-item {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(245,245,245,0.06);
+  }
+  .p9-detail-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .p9-detail-head {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .p9-detail-body {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(245,245,245,0.6);
+    line-height: 1.65;
+  }
+
+  /* ── PAGE 10 — BACK COVER ── */
+  #p10 {
+    background: var(--slate);
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 52px 64px;
+    position: relative;
+    overflow: hidden;
+  }
+  #p10 .p10-bg {
+    position: absolute;
+    bottom: -60px;
+    right: -40px;
+    font-family: var(--font-display);
+    font-size: 380px;
+    color: rgba(245,245,245,0.03);
+    line-height: 1;
+    letter-spacing: -8px;
+    pointer-events: none;
+  }
+  #p10 .p10-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  #p10 .p10-issue {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    color: var(--eucalyptus);
+    text-transform: uppercase;
+  }
+  #p10 .p10-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #p10 .p10-rule {
+    width: 60px;
+    height: 2px;
+    background: var(--eucalyptus);
+    margin-bottom: 32px;
+  }
+  #p10 .p10-cta {
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    color: rgba(245,245,245,0.5);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  #p10 .p10-url {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--eucalyptus);
+    letter-spacing: 0.1em;
+    margin-bottom: 32px;
+  }
+  #p10 .p10-principle {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4vw, 56px);
+    color: rgba(245,245,245,0.15);
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  #p10 .p10-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  #p10 .p10-brand {
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--white);
+    text-transform: uppercase;
+  }
+  #p10 .p10-brand span { color: var(--eucalyptus); }
+  #p10 .p10-meta {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: rgba(245,245,245,0.25);
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.8;
+  }
+</style>
+</head>
+
+<body>
+<div id="magazine">
+
+  <!-- ── PAGE 1: COVER ── -->
+  <div class="page" id="p1">
+    <div class="p1-top">
+      <div class="p1-issue">N1 Article 03 · Apr 2026</div>
+      <div class="p1-num">03</div>
+    </div>
+    <div class="p1-center">
+      <div class="p1-pre">Force-Time Benchmark · Libero</div>
+      <div class="p1-title-line">BRAKING</div>
+      <div class="p1-title-line">FOR A</div>
+      <div class="p1-title-accent">LIVING</div>
+      <div class="p1-rule"></div>
+      <div class="p1-sub">The Libero Force-Time Benchmark</div>
+      <div class="p1-athletes">L·1 · L·2 · [ORGANIZATION] Volleyball · Apr 2026</div>
+    </div>
+    <div class="p1-bottom">
+      <div class="p1-brand">N1 <span>Performance Lab</span></div>
+      <div class="p1-meta">
+        Impulse-Momentum Priority<br>
+        V10.5 Forensic Protocol<br>
+        Hawkin Dynamics CMJ
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 2: THE QUESTION ── -->
+  <div class="page" id="p2">
+    <div class="p2-left">
+      <div class="p2-label">The Core Question</div>
+      <div class="p2-q white">WHAT</div>
+      <div class="p2-q white">DOES</div>
+      <div class="p2-q green">GOOD</div>
+      <div class="p2-q white">LOOK LIKE?</div>
+    </div>
+    <div class="p2-right">
+      <div class="p2-stat-row">
+        <div class="p2-stat-num coral">−4.4%</div>
+        <div class="p2-stat-label">RSI_Mod gap between L·1 (benchmark) and L·2 (below).<br>0.091 vs 0.087.</div>
+      </div>
+      <div class="p2-stat-row">
+        <div class="p2-stat-num coral">+6ms</div>
+        <div class="p2-stat-label">Contraction time gap. L·1 at 325ms. L·2 at 331ms.<br>Six milliseconds. One missed dig.</div>
+      </div>
+      <div class="p2-stat-row">
+        <div class="p2-stat-num">−2.7%</div>
+        <div class="p2-stat-label">Braking RFD gap. 49.1 vs 47.8.<br>Same position. Different braking signature.</div>
+      </div>
+      <div class="p2-source">[ORGANIZATION] · Hawkin Dynamics CMJ · Apr 2026</div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 3: THE METRIC ── -->
+  <div class="page" id="p3">
+    <div class="p3-top">
+      <div class="p3-label">The Right Diagnostic</div>
+      <div class="p3-title">RSI <span class="p3-title-accent">MODIFIED</span></div>
+    </div>
+    <div class="p3-pull">
+      <div class="p3-pull-text">THE LIBERO DOES NOT NEED TO JUMP LIKE A MIDDLE BLOCKER. THEY NEED TO BRAKE LIKE THE BEST VERSION OF THEMSELVES.</div>
+    </div>
+    <div class="p3-bottom">
+      <div class="p3-def">
+        <div class="p3-def-head">RSI_Mod</div>
+        <div class="p3-def-body">Flight Time ÷ Contraction Time. A ratio of reactive output to total movement time. For a floor athlete, this is the primary diagnostic. Jump height is irrelevant. How fast the braking system can absorb and redirect force is everything.</div>
+      </div>
+      <div class="p3-def">
+        <div class="p3-def-head">Braking RFD</div>
+        <div class="p3-def-body">Rate of Force Development in the eccentric phase. Governs how steeply force rises after nadir. A higher Braking RFD means the system loads and transitions faster. For a Libero, this maps directly to reactive deceleration on the floor — the speed of the first step toward a ball.</div>
+      </div>
+      <div class="p3-def">
+        <div class="p3-def-head">Contraction Time</div>
+        <div class="p3-def-body">Total movement time from initiation to takeoff. The window the neuromuscular system uses to execute the full eccentric-concentric cycle. A shorter CT at equivalent flight time means a more efficient system. Benchmark for this Libero group: ≤325ms.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 4: THE NUMBERS ── -->
+  <div class="page" id="p4">
+    <div class="num-cell nc1">
+      <div class="num-cell-label">L·1 — Pre-season</div>
+      <div class="num-cell-date">Baseline</div>
+      <div class="num-cell-stat">0.086</div>
+      <div class="num-cell-unit">RSI_Mod</div>
+      <div class="num-cell-sub">CT 332ms · Braking RFD 46.8 · JH 28.1cm</div>
+    </div>
+    <div class="num-cell nc2">
+      <div class="num-cell-label">L·1 — Current · Benchmark</div>
+      <div class="num-cell-date">Apr 2026</div>
+      <div class="num-cell-stat">0.091</div>
+      <div class="num-cell-unit">RSI_Mod · +5.8%</div>
+      <div class="num-cell-sub">CT 325ms · Braking RFD 49.1 · JH 29.4cm</div>
+    </div>
+    <div class="num-cell nc3">
+      <div class="num-cell-label">L·2 — Pre-season</div>
+      <div class="num-cell-date">Baseline</div>
+      <div class="num-cell-stat">0.082</div>
+      <div class="num-cell-unit">RSI_Mod</div>
+      <div class="num-cell-sub">CT 338ms · Braking RFD 45.5 · JH 27.4cm</div>
+    </div>
+    <div class="num-cell nc4">
+      <div class="num-cell-label">L·2 — Current · Below Benchmark</div>
+      <div class="num-cell-date">Apr 2026</div>
+      <div class="num-cell-stat">0.087</div>
+      <div class="num-cell-unit">RSI_Mod · +6.1%</div>
+      <div class="num-cell-sub">CT 331ms · Braking RFD 47.8 · JH 28.8cm</div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 5: THE DELTA ── -->
+  <div class="page" id="p5">
+    <div class="p5-left">
+      <div class="p5-athlete">L·1</div>
+      <div class="p5-pos">Libero · Benchmark</div>
+      <div class="p5-delta">+5.8%</div>
+      <div class="p5-arrow">RSI_Mod ↑</div>
+      <div class="p5-from-to">
+        Pre-season: 0.086<br>
+        Current: 0.091<br>
+        CT: 332ms → 325ms
+      </div>
+      <div class="p5-note">At benchmark on all three primary metrics. RSI_Mod ≥ 0.091. CT ≤ 325ms. Braking RFD ≥ 49.1. Training block response confirmed.</div>
+    </div>
+    <div class="p5-right">
+      <div class="p5-athlete">L·2</div>
+      <div class="p5-pos">Libero · Below Benchmark</div>
+      <div class="p5-delta">+6.1%</div>
+      <div class="p5-arrow">RSI_Mod ↑</div>
+      <div class="p5-from-to">
+        Pre-season: 0.082<br>
+        Current: 0.087<br>
+        CT: 338ms → 331ms
+      </div>
+      <div class="p5-note">Improvement rate is correct. Gap to benchmark: 4.4% on RSI_Mod. 6ms on CT. Next test date determines whether the trajectory closes the gap in time.</div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 6: SIGNAL GRID ── -->
+  <div class="page" id="p6">
+    <div class="p6-header">
+      <div class="p6-label">Metric Signal Summary</div>
+      <div class="p6-title">Libero Quality Read · Apr 2026</div>
+      <div class="p6-date">[ORGANIZATION] · Hawkin Dynamics CMJ · V10.5</div>
+    </div>
+    <div class="p6-grid">
+      <!-- L·1 row -->
+      <div class="sig-tile sig-green">
+        <div class="sig-tile-metric">RSI_Mod</div>
+        <div class="sig-tile-athlete">L·1</div>
+        <div class="sig-tile-val">0.091</div>
+        <div class="sig-tile-signal">✓ At Benchmark</div>
+      </div>
+      <div class="sig-tile sig-green">
+        <div class="sig-tile-metric">Braking RFD</div>
+        <div class="sig-tile-athlete">L·1</div>
+        <div class="sig-tile-val">49.1</div>
+        <div class="sig-tile-signal">✓ At Benchmark</div>
+      </div>
+      <div class="sig-tile sig-green">
+        <div class="sig-tile-metric">Contraction Time</div>
+        <div class="sig-tile-athlete">L·1</div>
+        <div class="sig-tile-val">325ms</div>
+        <div class="sig-tile-signal">✓ At Benchmark</div>
+      </div>
+      <!-- L·2 row -->
+      <div class="sig-tile sig-red">
+        <div class="sig-tile-metric">RSI_Mod</div>
+        <div class="sig-tile-athlete">L·2</div>
+        <div class="sig-tile-val">0.087</div>
+        <div class="sig-tile-signal">✗ Below −4.4%</div>
+      </div>
+      <div class="sig-tile sig-amber">
+        <div class="sig-tile-metric">Braking RFD</div>
+        <div class="sig-tile-athlete">L·2</div>
+        <div class="sig-tile-val">47.8</div>
+        <div class="sig-tile-signal">⚠ Below −2.7%</div>
+      </div>
+      <div class="sig-tile sig-red">
+        <div class="sig-tile-metric">Contraction Time</div>
+        <div class="sig-tile-athlete">L·2</div>
+        <div class="sig-tile-val">331ms</div>
+        <div class="sig-tile-signal">✗ Below +6ms</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 7: THE PATTERN ── -->
+  <div class="page" id="p7">
+    <div class="p7-left">
+      <div class="p7-kicker">What the curve shows</div>
+      <div class="p7-head1">BRAKING</div>
+      <div class="p7-head2">SLOPE</div>
+      <div class="p7-body">
+        The kinetic signature tells the story. L·1's braking phase rises steeply — force climbs from nadir to peak in 22 normalized time units. L·2 takes 25. The slope is shallower. The eccentric-to-concentric transition is less abrupt. The system spends more time in the loading phase before redirecting.<br><br>
+        For a position built on reactive floor speed, delayed redirection is not a mechanical curiosity. It is a performance cost that shows up in coverage radius on game day.
+      </div>
+      <span class="p7-metric-tag">Braking RFD</span>
+      <span class="p7-metric-tag">RSI_Mod</span>
+    </div>
+    <div class="p7-right">
+      <div class="p7-kicker">Training response</div>
+      <div class="p7-head1">BOTH</div>
+      <div class="p7-head2">IMPROVED</div>
+      <div class="p7-body">
+        L·1 Braking_RFD: 46.8 → 49.1 (+4.9%). L·2: 45.5 → 47.8 (+5.1%). RSI_Mod improvements were similar: +5.8% and +6.1% respectively.<br><br>
+        The braking system responded to the training block. The improvement rates are nearly identical. The benchmark gap persists because L·2 started lower. The question is not whether L·2 can improve — it clearly can. The question is whether the improvement rate is sufficient to close the gap before the competitive block begins.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 8: VERDICT ── -->
+  <div class="page" id="p8">
+    <div class="p8-left">
+      <div class="p8-bg-text">VERDICT</div>
+      <div class="p8-verdict-label">Position Assessment · Apr 2026</div>
+      <div class="p8-v1">L·1 IS AT</div>
+      <div class="p8-v2">BENCHMARK</div>
+      <div class="p8-status">
+        <div class="p8-dot"></div>
+        <div class="p8-status-text">Standard Met</div>
+      </div>
+      <div class="p8-status coral-status" style="margin-top:8px;">
+        <div class="p8-dot coral-dot"></div>
+        <div class="p8-status-text coral-text">L·2 — Below Benchmark</div>
+      </div>
+    </div>
+    <div class="p8-right">
+      <div class="p8-watch-label">L·2 — Path to Benchmark</div>
+      <div class="p8-watch-item">
+        <div class="p8-watch-num">1</div>
+        <div class="p8-watch-text">
+          <strong>RSI_Mod: 0.087 → 0.091</strong>
+          4.4% improvement required. At current trajectory (+6.1% per block), achievable within one training block. Confirm at next test date.
+        </div>
+      </div>
+      <div class="p8-watch-item">
+        <div class="p8-watch-num">2</div>
+        <div class="p8-watch-text">
+          <strong>Contraction Time: 331ms → ≤325ms</strong>
+          6ms reduction required. Reactive plyometric loading is the primary training stimulus. Prioritize over volume.
+        </div>
+      </div>
+      <div class="p8-watch-item">
+        <div class="p8-watch-num">3</div>
+        <div class="p8-watch-text">
+          <strong>Braking RFD: 47.8 → ≥49.1</strong>
+          2.7% gap. Eccentric overload and deceleration-focused sessions. Monitor asymmetry alongside absolute RFD.
+        </div>
+      </div>
+      <div class="p8-watch-item">
+        <div class="p8-watch-num">4</div>
+        <div class="p8-watch-text">
+          <strong>Flag threshold: RSI_Mod &lt; 0.085</strong>
+          If L·2 drops below 0.085, escalate review. That value represents regression below pre-season baseline.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 9: WHAT COMES NEXT ── -->
+  <div class="page" id="p9">
+    <div class="p9-top">
+      <div>
+        <div class="p9-kicker">What comes next</div>
+        <div class="p9-title">THE BENCHMARK<br>IS MOVABLE</div>
+      </div>
+      <div class="p9-num">09</div>
+    </div>
+    <div class="p9-body">
+      <div class="p9-pull">
+        Not a squad average.<br>
+        A <em>position standard.</em><br>
+        The best Libero in this group defines it.<br>
+        The next test date shows whether<br>
+        <em>L·2 meets it.</em>
+      </div>
+      <div class="p9-detail">
+        <div class="p9-detail-item">
+          <div class="p9-detail-head">Benchmark Evolution</div>
+          <div class="p9-detail-body">As L·1 improves, the benchmark moves. The standard defined here — RSI_Mod ≥ 0.091, CT ≤ 325ms, RFD ≥ 49.1 — is a snapshot. Re-evaluate after every testing block.</div>
+        </div>
+        <div class="p9-detail-item">
+          <div class="p9-detail-head">Training Priority: L·2</div>
+          <div class="p9-detail-body">Reactive deceleration drills. Eccentric overload. Plyometric braking. Prioritize CT reduction over raw force output. The gap is in the transition speed, not the peak.</div>
+        </div>
+        <div class="p9-detail-item">
+          <div class="p9-detail-head">Monitor Trigger</div>
+          <div class="p9-detail-body">RSI_Mod below 0.085 for L·2 triggers a review. Below 0.080 triggers load reduction and physio escalation regardless of other metrics.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE 10: BACK COVER ── -->
+  <div class="page" id="p10">
+    <div class="p10-bg">03</div>
+    <div class="p10-top">
+      <div class="p10-issue">N1 Article 03 · Libero Benchmark · Apr 2026</div>
+    </div>
+    <div class="p10-center">
+      <div class="p10-rule"></div>
+      <div class="p10-cta">Read the full analysis</div>
+      <div class="p10-url">n1-article-03.vercel.app</div>
+      <div class="p10-principle">IMPULSE OVER PEAK FORCE</div>
+    </div>
+    <div class="p10-bottom">
+      <div class="p10-brand">N1 <span>Performance Lab</span></div>
+      <div class="p10-meta">
+        V10.5 Command Staff<br>
+        Hawkin Dynamics · CMJ Protocol<br>
+        [ORGANIZATION] · Apr 2026
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #magazine -->
+
+<!-- Nav dots -->
+<div id="nav-dots">
+  <div class="dot active" onclick="goTo(0)"></div>
+  <div class="dot" onclick="goTo(1)"></div>
+  <div class="dot" onclick="goTo(2)"></div>
+  <div class="dot" onclick="goTo(3)"></div>
+  <div class="dot" onclick="goTo(4)"></div>
+  <div class="dot" onclick="goTo(5)"></div>
+  <div class="dot" onclick="goTo(6)"></div>
+  <div class="dot" onclick="goTo(7)"></div>
+  <div class="dot" onclick="goTo(8)"></div>
+  <div class="dot" onclick="goTo(9)"></div>
+</div>
+
+<button class="arrow-nav hidden" id="arrow-left"  onclick="prevPage()">&#8592;</button>
+<button class="arrow-nav"        id="arrow-right" onclick="nextPage()">&#8594;</button>
+
+<script>
+  const mag   = document.getElementById('magazine');
+  const dots  = document.querySelectorAll('.dot');
+  const total = 10;
+  let current = 0;
+
+  function goTo(n) {
+    current = Math.max(0, Math.min(total - 1, n));
+    mag.scrollTo({ left: current * window.innerWidth, behavior: 'smooth' });
+    updateUI();
+  }
+
+  function nextPage() { goTo(current + 1); }
+  function prevPage() { goTo(current - 1); }
+
+  function updateUI() {
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    document.getElementById('arrow-left').classList.toggle('hidden', current === 0);
+    document.getElementById('arrow-right').classList.toggle('hidden', current === total - 1);
+  }
+
+  mag.addEventListener('scroll', () => {
+    const idx = Math.round(mag.scrollLeft / window.innerWidth);
+    if (idx !== current) { current = idx; updateUI(); }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') nextPage();
+    if (e.key === 'ArrowLeft')  prevPage();
+  });
+
+  updateUI();
+</script>
+</body>
+</html>
