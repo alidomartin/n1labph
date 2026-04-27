@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Injury Risk Modeling — N1 Performance Lab</title>
+<meta name="description" content="N1 Performance Lab uses machine learning and biomechanical assessment to identify acute injury risk in athletes before it occurs. Force plate and 3D motion capture — Philippines.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --slate:          #2C3E50;
+    --slate-deep:     #1a2530;
+    --slate-mid:      #3a5068;
+    --slate-muted:    #4A6278;
+    --eucalyptus:     #77DD77;
+    --eucalyptus-dk:  #4FA84F;
+    --white:          #F5F5F5;
+    --warm:           #F8F6F1;
+    --ink:            #1A1A1A;
+    --grey:           #888888;
+    --amber:          #C08A1A;
+    --amber-lt:       #F5A623;
+    --red:            #E84040;
+    --font-display:   'Bebas Neue', sans-serif;
+    --font-head:      'Space Grotesk', sans-serif;
+    --font-body:      'Inter', sans-serif;
+  }
+
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--slate-deep); }
+
+  /* ── SCROLL CONTAINER ── */
+  #magazine {
+    display: flex;
+    width: 100%; height: 100vh;
+    overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #magazine::-webkit-scrollbar { display: none; }
+
+  .page {
+    flex-shrink: 0;
+    width: 100vw; height: 100vh;
+    scroll-snap-align: start;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+  }
+  .page-dark  { background: var(--slate); }
+  .page-deep  { background: var(--slate-deep); }
+  .page-light { background: var(--warm); color: var(--ink); }
+
+  /* ── NAV DOTS ── */
+  #nav-dots {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 1000;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(245,245,245,0.3);
+    cursor: pointer; transition: all 0.3s ease;
+  }
+  .dot.active { background: var(--eucalyptus); width: 22px; border-radius: 3px; }
+
+  /* ── ARROWS ── */
+  .arrow-nav {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    z-index: 900;
+    background: rgba(245,245,245,0.08);
+    border: 1px solid rgba(245,245,245,0.15);
+    color: var(--white); width: 44px; height: 44px;
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px;
+    transition: opacity 0.3s ease;
+  }
+  .arrow-nav:hover { background: rgba(245,245,245,0.15); }
+  .arrow-nav.hidden { opacity: 0; pointer-events: none; }
+  #arrow-left  { left: 20px; }
+  #arrow-right { right: 20px; }
+
+  /* ── SHARED COMPONENTS ── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 0;
+    font-family: var(--font-head); font-size: 11px; letter-spacing: 0.12em;
+  }
+  .top-bar-dark { color: rgba(245,245,245,0.45); }
+  .top-bar-light { color: rgba(26,26,26,0.45); }
+  .tag {
+    background: var(--eucalyptus); color: var(--ink);
+    padding: 4px 10px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; font-family: var(--font-head);
+  }
+  .tag-amber { background: var(--amber-lt); }
+  .tag-outline-dark {
+    border: 1px solid rgba(245,245,245,0.25); color: rgba(245,245,245,0.6);
+    padding: 4px 10px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.1em; font-family: var(--font-head);
+  }
+  .tag-outline-light {
+    border: 1px solid rgba(26,26,26,0.25); color: rgba(26,26,26,0.55);
+    padding: 4px 10px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.1em; font-family: var(--font-head);
+  }
+  .ghost {
+    position: absolute;
+    font-family: var(--font-display);
+    color: rgba(245,245,245,0.025);
+    line-height: 1; pointer-events: none; user-select: none;
+  }
+  .ghost-dark { color: rgba(245,245,245,0.025); }
+  .ghost-light { color: rgba(26,26,26,0.04); }
+  .rule-euc { width: 48px; height: 2px; background: var(--eucalyptus); }
+  .rule-ink  { width: 48px; height: 2px; background: var(--ink); }
+  .kicker {
+    font-family: var(--font-head); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .kicker-euc  { color: var(--eucalyptus); }
+  .kicker-grey { color: var(--grey); }
+  .kicker-ink  { color: var(--ink); opacity: 0.55; }
+  .body-s {
+    font-family: var(--font-body); font-size: 14px;
+    line-height: 1.75; font-weight: 400;
+  }
+  .body-s-dark  { color: rgba(245,245,245,0.65); }
+  .body-s-light { color: rgba(26,26,26,0.75); }
+
+  /* ─────────────────────────────────────
+     P1 — COVER
+  ───────────────────────────────────── */
+  #p1 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p1 {
+    bottom: -40px; right: -20px;
+    font-size: clamp(260px, 40vw, 500px);
+  }
+  .p1-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .p1-brand {
+    font-family: var(--font-head); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.2em; color: rgba(245,245,245,0.5);
+  }
+  .p1-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+  .p1-kicker { color: var(--eucalyptus); font-family: var(--font-head); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; }
+  .p1-hero {
+    font-family: var(--font-display);
+    font-size: clamp(72px, 11vw, 150px);
+    line-height: 0.92; color: var(--white);
+  }
+  .p1-hero span { color: var(--eucalyptus); }
+  .p1-sub {
+    font-family: var(--font-body); font-size: 16px;
+    color: rgba(245,245,245,0.5); max-width: 520px;
+    line-height: 1.65; font-weight: 300;
+  }
+  .p1-bottom {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    width: 100%;
+  }
+  .p1-stat { display: flex; flex-direction: column; gap: 4px; }
+  .p1-stat-num {
+    font-family: var(--font-display); font-size: 48px;
+    color: var(--eucalyptus); line-height: 1;
+  }
+  .p1-stat-label {
+    font-family: var(--font-head); font-size: 10px;
+    color: rgba(245,245,245,0.4); letter-spacing: 0.12em;
+  }
+  .p1-stats-row { display: flex; gap: 48px; }
+  .p1-url {
+    font-family: var(--font-head); font-size: 11px;
+    color: rgba(245,245,245,0.3); letter-spacing: 0.1em;
+  }
+
+  /* ─────────────────────────────────────
+     P2 — THE PROBLEM
+  ───────────────────────────────────── */
+  #p2 { flex-direction: column; padding: 52px 64px; gap: 0; }
+  .ghost-p2 {
+    bottom: -30px; left: -10px;
+    font-size: clamp(200px, 32vw, 400px);
+  }
+  .p2-inner { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 36px; max-width: 640px; }
+  .p2-hero {
+    font-family: var(--font-display);
+    font-size: clamp(44px, 5.5vw, 72px);
+    color: var(--ink); line-height: 1.05;
+  }
+  .p2-hero span { color: var(--eucalyptus-dk); }
+  .p2-stat-row { display: flex; gap: 40px; border-top: 1px solid rgba(26,26,26,0.12); padding-top: 28px; }
+  .p2-stat-block { display: flex; flex-direction: column; gap: 6px; }
+  .p2-stat-num {
+    font-family: var(--font-display); font-size: 52px;
+    color: var(--ink); line-height: 1;
+  }
+  .p2-stat-label {
+    font-family: var(--font-head); font-size: 10px;
+    color: rgba(26,26,26,0.45); letter-spacing: 0.12em;
+    max-width: 160px; line-height: 1.4;
+  }
+  .p2-pull {
+    font-family: var(--font-head); font-size: 15px; font-weight: 600;
+    color: var(--ink); line-height: 1.5;
+    border-left: 3px solid var(--eucalyptus-dk);
+    padding-left: 16px;
+  }
+
+  /* ─────────────────────────────────────
+     P3 — ASSESSMENT FOUNDATION
+  ───────────────────────────────────── */
+  #p3 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p3 {
+    bottom: -20px; right: -20px;
+    font-size: clamp(200px, 30vw, 380px);
+  }
+  .p3-top-bar { width: 100%; }
+  .p3-split { flex: 1; display: flex; gap: 48px; align-items: stretch; padding-top: 40px; }
+  .p3-col { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .p3-col-head {
+    font-family: var(--font-display); font-size: 38px;
+    color: var(--white); line-height: 1;
+  }
+  .p3-divider { width: 1px; background: rgba(245,245,245,0.1); flex-shrink: 0; }
+  .p3-metric-row { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+  .p3-metric {
+    display: flex; align-items: baseline; gap: 10px;
+    border-bottom: 1px solid rgba(245,245,245,0.07);
+    padding-bottom: 10px;
+  }
+  .p3-metric-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--eucalyptus); flex-shrink: 0; margin-bottom: 2px;
+  }
+  .p3-metric-dot-amber { background: var(--amber-lt); }
+  .p3-metric-text {
+    font-family: var(--font-body); font-size: 13px;
+    color: rgba(245,245,245,0.6); line-height: 1.5;
+  }
+  .p3-bottom-bar {
+    width: 100%; border-top: 1px solid rgba(245,245,245,0.08);
+    padding-top: 20px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .p3-bottom-text {
+    font-family: var(--font-head); font-size: 11px;
+    color: rgba(245,245,245,0.3); letter-spacing: 0.1em;
+  }
+
+  /* ─────────────────────────────────────
+     P4 — VARIABLE ARCHITECTURE
+  ───────────────────────────────────── */
+  #p4 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p4 {
+    bottom: -20px; right: -10px;
+    font-size: clamp(180px, 28vw, 350px);
+  }
+  .p4-split { flex: 1; display: flex; gap: 56px; align-items: center; padding-top: 32px; }
+  .p4-left { flex: 0 0 auto; }
+  .p4-right { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .p4-head {
+    font-family: var(--font-display); font-size: clamp(38px, 5vw, 60px);
+    color: var(--ink); line-height: 1.0;
+  }
+  .p4-head span { color: var(--eucalyptus-dk); }
+  .p4-zone-list { display: flex; flex-direction: column; gap: 0; }
+  .p4-zone {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(26,26,26,0.08);
+  }
+  .p4-zone:first-child { border-top: 1px solid rgba(26,26,26,0.08); }
+  .p4-zone-label {
+    font-family: var(--font-head); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.1em; min-width: 130px; padding-top: 2px;
+  }
+  .p4-zone-vars {
+    font-family: var(--font-body); font-size: 12.5px;
+    color: rgba(26,26,26,0.6); line-height: 1.5;
+  }
+  .zone-green  { color: var(--eucalyptus-dk); }
+  .zone-amber  { color: var(--amber); }
+  .zone-ink    { color: var(--ink); opacity: 0.7; }
+
+  /* Body SVG */
+  .p4-body-svg { width: 180px; height: 300px; }
+
+  /* ─────────────────────────────────────
+     P5 — THE ALGORITHM
+  ───────────────────────────────────── */
+  #p5 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p5 {
+    bottom: -30px; right: -10px;
+    font-size: clamp(180px, 28vw, 360px);
+  }
+  .p5-split { flex: 1; display: flex; gap: 48px; align-items: flex-start; padding-top: 36px; }
+  .p5-col { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .p5-col-head {
+    font-family: var(--font-display); font-size: 34px;
+    color: var(--white); line-height: 1.05;
+  }
+  .p5-divider { width: 1px; background: rgba(245,245,245,0.1); flex-shrink: 0; margin-top: 0; }
+  .cost-box {
+    border: 1px solid rgba(245,245,245,0.12);
+    padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .cost-row { display: flex; align-items: center; gap: 12px; }
+  .cost-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .cost-icon-red  { background: rgba(232,64,64,0.2); color: var(--red); }
+  .cost-icon-euc  { background: rgba(119,221,119,0.2); color: var(--eucalyptus); }
+  .cost-row-text {
+    font-family: var(--font-body); font-size: 12.5px;
+    color: rgba(245,245,245,0.6); line-height: 1.5;
+  }
+  .cost-label {
+    font-family: var(--font-head); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; margin-bottom: 4px;
+  }
+
+  /* ─────────────────────────────────────
+     P6 — MODEL PERFORMANCE
+  ───────────────────────────────────── */
+  #p6 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p6 {
+    bottom: -20px; right: -10px;
+    font-size: clamp(180px, 28vw, 360px);
+  }
+  .p6-split { flex: 1; display: flex; gap: 56px; align-items: center; padding-top: 28px; }
+  .p6-left { flex: 0 0 340px; }
+  .p6-right { flex: 1; display: flex; flex-direction: column; gap: 24px; justify-content: center; }
+  .p6-metric-big { display: flex; flex-direction: column; gap: 4px; }
+  .p6-num {
+    font-family: var(--font-display); font-size: clamp(64px, 8vw, 96px);
+    color: var(--ink); line-height: 1;
+  }
+  .p6-num span { color: var(--eucalyptus-dk); }
+  .p6-denom {
+    font-family: var(--font-head); font-size: 12px; color: rgba(26,26,26,0.5);
+    letter-spacing: 0.1em; font-weight: 600;
+  }
+  .p6-interp {
+    font-family: var(--font-body); font-size: 13.5px;
+    color: rgba(26,26,26,0.65); line-height: 1.7;
+    padding: 16px; border-left: 3px solid var(--eucalyptus-dk);
+    background: rgba(79,168,79,0.07);
+  }
+  .p6-ref-note {
+    font-family: var(--font-head); font-size: 10px; font-weight: 600;
+    color: rgba(26,26,26,0.35); letter-spacing: 0.1em;
+    border-top: 1px solid rgba(26,26,26,0.1); padding-top: 12px;
+  }
+  .p6-stat-pair { display: flex; gap: 36px; }
+  .p6-stat-item { display: flex; flex-direction: column; gap: 4px; }
+  .p6-stat-val {
+    font-family: var(--font-display); font-size: 40px; color: var(--ink); line-height: 1;
+  }
+  .p6-stat-val.euc { color: var(--eucalyptus-dk); }
+  .p6-stat-desc {
+    font-family: var(--font-head); font-size: 10px; color: rgba(26,26,26,0.45);
+    letter-spacing: 0.1em; max-width: 120px; line-height: 1.4;
+  }
+
+  /* ─────────────────────────────────────
+     P7 — RISK DRIVER PROFILING
+  ───────────────────────────────────── */
+  #p7 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p7 {
+    bottom: -30px; right: -10px;
+    font-size: clamp(180px, 28vw, 360px);
+  }
+  .p7-split { flex: 1; display: flex; gap: 56px; align-items: flex-start; padding-top: 28px; }
+  .p7-left { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .p7-right { flex: 0 0 360px; }
+  .p7-head {
+    font-family: var(--font-display); font-size: clamp(36px, 4.5vw, 58px);
+    color: var(--white); line-height: 1.0;
+  }
+  .p7-head span { color: var(--eucalyptus); }
+  .p7-legend { display: flex; gap: 20px; padding-top: 4px; }
+  .p7-legend-item { display: flex; align-items: center; gap: 8px; }
+  .p7-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .p7-legend-text { font-family: var(--font-head); font-size: 11px; color: rgba(245,245,245,0.5); letter-spacing: 0.08em; }
+  .p7-insight-box {
+    border: 1px solid rgba(119,221,119,0.25);
+    background: rgba(119,221,119,0.06);
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .p7-insight-label { font-family: var(--font-head); font-size: 10px; font-weight: 700; color: var(--eucalyptus); letter-spacing: 0.15em; }
+  .p7-insight-text { font-family: var(--font-body); font-size: 13px; color: rgba(245,245,245,0.6); line-height: 1.6; }
+
+  /* ─────────────────────────────────────
+     P8 — DETECTION TO ACTION
+  ───────────────────────────────────── */
+  #p8 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p8 {
+    bottom: -20px; right: -10px;
+    font-size: clamp(180px, 28vw, 360px);
+  }
+  .p8-head {
+    font-family: var(--font-display); font-size: clamp(36px, 5vw, 64px);
+    color: var(--ink); line-height: 1.0; margin: 28px 0 32px;
+  }
+  .p8-head span { color: var(--eucalyptus-dk); }
+  .p8-pipeline { display: flex; align-items: flex-start; gap: 0; flex: 1; }
+  .p8-step { flex: 1; display: flex; flex-direction: column; gap: 12px; padding-right: 24px; position: relative; }
+  .p8-step:not(:last-child)::after {
+    content: '→';
+    position: absolute; right: 4px; top: 12px;
+    color: rgba(26,26,26,0.25); font-size: 20px;
+  }
+  .p8-step-num {
+    font-family: var(--font-display); font-size: 48px;
+    color: rgba(26,26,26,0.1); line-height: 1;
+  }
+  .p8-step-title {
+    font-family: var(--font-head); font-size: 13px; font-weight: 700;
+    color: var(--ink); letter-spacing: 0.06em;
+  }
+  .p8-step-body {
+    font-family: var(--font-body); font-size: 12.5px;
+    color: rgba(26,26,26,0.6); line-height: 1.6;
+  }
+  .p8-step-accent { border-top: 2px solid var(--eucalyptus-dk); padding-top: 10px; }
+  .p8-footer {
+    border-top: 1px solid rgba(26,26,26,0.1);
+    padding-top: 20px; margin-top: 8px;
+    font-family: var(--font-head); font-size: 11px;
+    color: rgba(26,26,26,0.4); letter-spacing: 0.1em;
+  }
+
+  /* ─────────────────────────────────────
+     P9 — BUILDING THIS NOW
+  ───────────────────────────────────── */
+  #p9 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p9 {
+    bottom: -30px; right: -10px;
+    font-size: clamp(180px, 28vw, 360px);
+  }
+  .p9-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 32px; }
+  .p9-hero {
+    font-family: var(--font-display); font-size: clamp(52px, 7vw, 96px);
+    color: var(--white); line-height: 0.95;
+  }
+  .p9-hero span { color: var(--eucalyptus); }
+  .p9-status-list { display: flex; flex-direction: column; gap: 0; max-width: 560px; }
+  .p9-status-item {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 16px 0; border-bottom: 1px solid rgba(245,245,245,0.08);
+  }
+  .p9-status-icon {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; margin-top: 1px;
+  }
+  .status-live { background: rgba(119,221,119,0.25); color: var(--eucalyptus); }
+  .status-build { background: rgba(245,166,35,0.2); color: var(--amber-lt); }
+  .status-soon { background: rgba(245,245,245,0.08); color: rgba(245,245,245,0.4); }
+  .p9-status-text { font-family: var(--font-body); font-size: 13.5px; color: rgba(245,245,245,0.65); line-height: 1.6; }
+  .p9-status-text strong { color: var(--white); font-weight: 600; font-family: var(--font-head); font-size: 12px; letter-spacing: 0.06em; }
+  .p9-cta {
+    display: inline-block; margin-top: 8px;
+    background: var(--eucalyptus); color: var(--ink);
+    font-family: var(--font-head); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.12em; padding: 14px 28px; text-decoration: none;
+    align-self: flex-start;
+  }
+  .p9-cta:hover { background: var(--eucalyptus-dk); }
+
+  /* ─────────────────────────────────────
+     P10 — BACK COVER
+  ───────────────────────────────────── */
+  #p10 { flex-direction: column; padding: 52px 64px; }
+  .ghost-p10 {
+    bottom: -40px; right: -20px;
+    font-size: clamp(260px, 40vw, 500px);
+  }
+  .p10-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
+  .p10-hero {
+    font-family: var(--font-display); font-size: clamp(64px, 9vw, 120px);
+    color: var(--white); line-height: 0.9;
+  }
+  .p10-hero span { color: var(--eucalyptus); }
+  .p10-sub {
+    font-family: var(--font-body); font-size: 15px;
+    color: rgba(245,245,245,0.4); max-width: 440px;
+    line-height: 1.7; font-weight: 300;
+  }
+  .p10-contact-row { display: flex; gap: 40px; border-top: 1px solid rgba(245,245,245,0.1); padding-top: 28px; }
+  .p10-contact-item { display: flex; flex-direction: column; gap: 4px; }
+  .p10-contact-label {
+    font-family: var(--font-head); font-size: 9px; font-weight: 700;
+    color: rgba(245,245,245,0.3); letter-spacing: 0.15em;
+  }
+  .p10-contact-val {
+    font-family: var(--font-head); font-size: 12px; font-weight: 500;
+    color: rgba(245,245,245,0.7); letter-spacing: 0.06em;
+  }
+  .p10-bottom { width: 100%; display: flex; justify-content: space-between; align-items: flex-end; }
+  .p10-seo {
+    font-family: var(--font-head); font-size: 10px;
+    color: rgba(245,245,245,0.2); letter-spacing: 0.08em; max-width: 380px; line-height: 1.6;
+  }
+  .p10-url { font-family: var(--font-head); font-size: 11px; color: rgba(245,245,245,0.3); letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<div id="magazine">
+
+  <!-- ═══════════════════════════════════
+       PAGE 1 — COVER
+  ════════════════════════════════════ -->
+  <section class="page page-deep" id="p1">
+    <div class="ghost ghost-dark ghost-p1">01</div>
+
+    <div class="p1-top">
+      <span class="p1-brand">N1 PERFORMANCE LAB</span>
+      <span class="tag">BIOMECHANICAL INTELLIGENCE</span>
+    </div>
+
+    <div class="p1-mid">
+      <div class="p1-kicker">INJURY RISK MODELING</div>
+      <div class="p1-hero">
+        BEFORE<br><span>IT</span><br>HAPPENS
+      </div>
+      <div class="p1-sub">
+        A machine learning framework built on force plate data — designed to identify athletes at risk of acute knee injury before they sustain one. 3D motion capture integration in development.
+      </div>
+    </div>
+
+    <div class="p1-bottom">
+      <div class="p1-stats-row">
+        <div class="p1-stat">
+          <div class="p1-stat-num">34</div>
+          <div class="p1-stat-label">KINEMATIC VARIABLES</div>
+        </div>
+        <div class="p1-stat">
+          <div class="p1-stat-num">0.75</div>
+          <div class="p1-stat-label">TARGET AUC</div>
+        </div>
+        <div class="p1-stat">
+          <div class="p1-stat-num">6/10</div>
+          <div class="p1-stat-label">PROSPECTIVE INJURIES FLAGGED</div>
+        </div>
+      </div>
+      <div class="p1-url">n1-magazine.vercel.app</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 2 — THE PROBLEM
+  ════════════════════════════════════ -->
+  <section class="page page-light" id="p2">
+    <div class="ghost ghost-light ghost-p2">02</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-light" style="margin-bottom:40px;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag-outline-light">THE PROBLEM</span>
+      </div>
+
+      <div class="p2-inner">
+        <div class="kicker kicker-ink">WHY LOAD MANAGEMENT ISN'T ENOUGH</div>
+        <div class="rule-ink"></div>
+        <div class="p2-hero">
+          Workload reduction<br>doesn't change<br><span>who breaks.</span>
+        </div>
+        <div class="body-s body-s-light">
+          Load management answers one question: how much. It does not answer the more important one: how well. Volume and intensity metrics say nothing about the movement strategy an athlete uses to absorb and produce force. Two athletes can carry identical workloads and move with entirely different levels of mechanical risk.
+        </div>
+        <div class="body-s body-s-light">
+          Non-contact knee injuries occur most often during movements an athlete has executed thousands of times. The injury is not caused by unfamiliarity. It is caused by a mechanical pattern that exceeded the tissue's tolerance on that repetition. That pattern is detectable before the injury. The signal exists in the data.
+        </div>
+        <div class="p2-pull">
+          "The aim of workload reduction is to restore the athlete's baseline. The aim of N1 is to raise it."
+        </div>
+        <div class="p2-stat-row">
+          <div class="p2-stat-block">
+            <div class="p2-stat-num">~70%</div>
+            <div class="p2-stat-label">OF ACL INJURIES ARE NON-CONTACT IN NATURE</div>
+          </div>
+          <div class="p2-stat-block">
+            <div class="p2-stat-num">Pre-</div>
+            <div class="p2-stat-label">DETECTABLE RISK EXISTS BEFORE INJURY OCCURS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 3 — ASSESSMENT FOUNDATION
+  ════════════════════════════════════ -->
+  <section class="page page-dark" id="p3">
+    <div class="ghost ghost-dark ghost-p3">03</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-dark p3-top-bar" style="margin-bottom:0;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag">DATA FOUNDATION</span>
+      </div>
+
+      <div class="p3-split">
+        <div class="p3-col">
+          <div class="kicker kicker-euc">FORCE PLATE</div>
+          <div class="p3-col-head">GROUND<br>CONTACT<br>DATA</div>
+          <div class="body-s body-s-dark">
+            N1 uses the Hawkin Dynamics force plate as the primary assessment instrument. Every trial generates a complete ground reaction force curve sampled at 1,000Hz. From that curve, N1 extracts the impulse-momentum relationships that define how an athlete manages force through each phase of movement — braking, transition, and propulsion.
+          </div>
+          <div class="p3-metric-row">
+            <div class="p3-metric">
+              <div class="p3-metric-dot"></div>
+              <div class="p3-metric-text">Total movement impulse and impulse asymmetry</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot"></div>
+              <div class="p3-metric-text">Braking and propulsive phase durations and magnitudes</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot"></div>
+              <div class="p3-metric-text">Rate of force development across movement phases</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot"></div>
+              <div class="p3-metric-text">Body weight normalization for cross-athlete comparison</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p3-divider"></div>
+
+        <div class="p3-col" style="opacity: 0.45;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="kicker" style="color: rgba(245,245,245,0.4); letter-spacing:0.18em; font-family:var(--font-head); font-size:11px; font-weight:700;">3D MOTION CAPTURE</div>
+            <div style="background: rgba(245,166,35,0.18); border: 1px solid rgba(245,166,35,0.3); color: var(--amber-lt); font-family:var(--font-head); font-size:9px; font-weight:700; letter-spacing:0.12em; padding:3px 8px;">IN DEVELOPMENT</div>
+          </div>
+          <div class="p3-col-head" style="color: rgba(245,245,245,0.4);">JOINT<br>KINEMATICS<br>DATA</div>
+          <div class="body-s" style="color: rgba(245,245,245,0.35);">
+            Force plate data tells you what happened at the ground. It does not tell you which joint created it. Motion capture closes that gap. When integrated, it will track every segment of the kinematic chain in three dimensions — giving N1 a complete picture of how force is generated, transferred, and absorbed from foot to hip on every trial.
+          </div>
+          <div class="p3-metric-row">
+            <div class="p3-metric">
+              <div class="p3-metric-dot" style="background: rgba(245,245,245,0.2);"></div>
+              <div class="p3-metric-text" style="color: rgba(245,245,245,0.3);">Hip active deceleration and peak flexion angles</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot" style="background: rgba(245,245,245,0.2);"></div>
+              <div class="p3-metric-text" style="color: rgba(245,245,245,0.3);">Femoral and tibial rotation — pattern and instantaneous</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot" style="background: rgba(245,245,245,0.2);"></div>
+              <div class="p3-metric-text" style="color: rgba(245,245,245,0.3);">Knee flexion velocity and active deceleration capacity</div>
+            </div>
+            <div class="p3-metric">
+              <div class="p3-metric-dot" style="background: rgba(245,245,245,0.2);"></div>
+              <div class="p3-metric-text" style="color: rgba(245,245,245,0.3);">Ankle dorsiflexion and foot eversion patterns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p3-bottom-bar">
+        <span class="p3-bottom-text">HAWKIN DYNAMICS · 3D MOTION CAPTURE (IN DEVELOPMENT)</span>
+        <span class="p3-bottom-text">N1 PERFORMANCE LAB PH</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 4 — VARIABLE ARCHITECTURE
+  ════════════════════════════════════ -->
+  <section class="page page-light" id="p4">
+    <div class="ghost ghost-light ghost-p4">04</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-light" style="margin-bottom:0;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag-outline-light">VARIABLE FRAMEWORK</span>
+      </div>
+
+      <div class="p4-split">
+        <div class="p4-left">
+          <!-- Schematic body SVG — original N1 design -->
+          <svg class="p4-body-svg" viewBox="0 0 180 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Head -->
+            <circle cx="90" cy="28" r="22" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <!-- Torso -->
+            <rect x="58" y="54" width="64" height="82" rx="8" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <!-- FT Zone badge on torso -->
+            <rect x="62" y="68" width="56" height="20" rx="3" fill="#4FA84F" opacity="0.2"/>
+            <text x="90" y="82" text-anchor="middle" font-family="Inter" font-size="8" fill="#4FA84F" font-weight="700">FT CURVE</text>
+            <!-- Hip -->
+            <ellipse cx="90" cy="138" rx="36" ry="14" fill="#DDDAD4" stroke="#1A1A1A" stroke-width="1.5"/>
+            <text x="90" y="142" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#C08A1A" font-weight="700">HIP</text>
+            <!-- Left Thigh -->
+            <rect x="52" y="150" width="30" height="62" rx="8" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <!-- Right Thigh -->
+            <rect x="98" y="150" width="30" height="62" rx="8" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <!-- Femur/Tibia label -->
+            <text x="67" y="183" text-anchor="middle" font-family="Inter" font-size="7" fill="#888" font-weight="600">FEMUR</text>
+            <!-- Knee left -->
+            <circle cx="67" cy="218" r="12" fill="#77DD77" opacity="0.35" stroke="#4FA84F" stroke-width="1.5"/>
+            <text x="67" y="222" text-anchor="middle" font-family="Inter" font-size="7" fill="#4FA84F" font-weight="700">KNEE</text>
+            <!-- Knee right -->
+            <circle cx="113" cy="218" r="12" fill="#77DD77" opacity="0.35" stroke="#4FA84F" stroke-width="1.5"/>
+            <text x="113" y="222" text-anchor="middle" font-family="Inter" font-size="7" fill="#4FA84F" font-weight="700">KNEE</text>
+            <!-- Left Shin -->
+            <rect x="55" y="232" width="24" height="52" rx="6" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <!-- Right Shin -->
+            <rect x="101" y="232" width="24" height="52" rx="6" fill="#E8E4DF" stroke="#1A1A1A" stroke-width="1.5"/>
+            <text x="67" y="258" text-anchor="middle" font-family="Inter" font-size="7" fill="#888" font-weight="600">TIBIA</text>
+            <!-- Ankle/Foot Left -->
+            <ellipse cx="67" cy="289" rx="16" ry="9" fill="#F5A623" opacity="0.25" stroke="#C08A1A" stroke-width="1.5"/>
+            <text x="67" y="292" text-anchor="middle" font-family="Inter" font-size="6.5" fill="#C08A1A" font-weight="700">ANKLE</text>
+            <!-- Ankle/Foot Right -->
+            <ellipse cx="113" cy="289" rx="16" ry="9" fill="#F5A623" opacity="0.25" stroke="#C08A1A" stroke-width="1.5"/>
+            <text x="113" y="292" text-anchor="middle" font-family="Inter" font-size="6.5" fill="#C08A1A" font-weight="700">ANKLE</text>
+            <!-- Foot bars -->
+            <rect x="51" y="300" width="32" height="10" rx="3" fill="#888" opacity="0.3"/>
+            <rect x="97" y="300" width="32" height="10" rx="3" fill="#888" opacity="0.3"/>
+            <text x="67" y="308" text-anchor="middle" font-family="Inter" font-size="6" fill="#888" font-weight="600">FOOT</text>
+            <text x="113" y="308" text-anchor="middle" font-family="Inter" font-size="6" fill="#888" font-weight="600">FOOT</text>
+          </svg>
+        </div>
+
+        <div class="p4-right">
+          <div class="kicker kicker-ink">THE KINEMATIC FINGERPRINT</div>
+          <div class="rule-ink"></div>
+          <div class="p4-head">34<br><span>VARIABLES.</span><br>ONE CHAIN.</div>
+          <div class="body-s body-s-light">
+            No single variable predicts a knee injury. What predicts it is the specific combination of variables — and that combination is different for every athlete. N1 captures this by measuring across six anatomical zones, building a complete mechanical fingerprint per assessment.
+          </div>
+          <div class="p4-zone-list">
+            <div class="p4-zone">
+              <div class="p4-zone-label zone-green">FORCE-TIME CURVE</div>
+              <div class="p4-zone-vars">Ground contact impulse metrics, total movement impulse, impulse differential</div>
+            </div>
+            <div class="p4-zone" style="opacity:0.4;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:130px;">
+                <div class="p4-zone-label zone-amber" style="min-width:auto;">HIP</div>
+                <span style="font-family:var(--font-head); font-size:8px; font-weight:700; color:var(--amber); letter-spacing:0.1em; border:1px solid rgba(192,138,26,0.4); padding:2px 6px;">SOON</span>
+              </div>
+              <div class="p4-zone-vars">Posterior chain — peak flexion, active deceleration capacity</div>
+            </div>
+            <div class="p4-zone" style="opacity:0.4;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:130px;">
+                <div class="p4-zone-label zone-ink" style="min-width:auto;">FEMUR / TIBIA</div>
+                <span style="font-family:var(--font-head); font-size:8px; font-weight:700; color:var(--amber); letter-spacing:0.1em; border:1px solid rgba(192,138,26,0.4); padding:2px 6px;">SOON</span>
+              </div>
+              <div class="p4-zone-vars">Rotation patterns and instantaneous rotation values at key timepoints</div>
+            </div>
+            <div class="p4-zone" style="opacity:0.4;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:130px;">
+                <div class="p4-zone-label zone-green" style="min-width:auto;">KNEE</div>
+                <span style="font-family:var(--font-head); font-size:8px; font-weight:700; color:var(--amber); letter-spacing:0.1em; border:1px solid rgba(192,138,26,0.4); padding:2px 6px;">SOON</span>
+              </div>
+              <div class="p4-zone-vars">Flexion angle, velocity, delta, and active deceleration</div>
+            </div>
+            <div class="p4-zone" style="opacity:0.4;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:130px;">
+                <div class="p4-zone-label zone-amber" style="min-width:auto;">ANKLE</div>
+                <span style="font-family:var(--font-head); font-size:8px; font-weight:700; color:var(--amber); letter-spacing:0.1em; border:1px solid rgba(192,138,26,0.4); padding:2px 6px;">SOON</span>
+              </div>
+              <div class="p4-zone-vars">Dorsiflexion range, velocity, and deceleration at ground contact</div>
+            </div>
+            <div class="p4-zone" style="opacity:0.4;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:130px;">
+                <div class="p4-zone-label zone-ink" style="min-width:auto;">FOOT</div>
+                <span style="font-family:var(--font-head); font-size:8px; font-weight:700; color:var(--amber); letter-spacing:0.1em; border:1px solid rgba(192,138,26,0.4); padding:2px 6px;">SOON</span>
+              </div>
+              <div class="p4-zone-vars">Translation and eversion — rotational pattern and instantaneous values</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 5 — THE ALGORITHM
+  ════════════════════════════════════ -->
+  <section class="page page-dark" id="p5">
+    <div class="ghost ghost-dark ghost-p5">05</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-dark" style="margin-bottom:0;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag">MODEL ARCHITECTURE</span>
+      </div>
+
+      <div class="p5-split">
+        <div class="p5-col">
+          <div class="kicker kicker-euc">WHY XGBOOST</div>
+          <div class="p5-col-head">A NON-LINEAR<br>PROBLEM REQUIRES<br>A NON-LINEAR<br>SOLUTION</div>
+          <div class="body-s body-s-dark">
+            Hip deceleration alone does not predict a knee injury. Tibial rotation alone does not predict one either. What matters is how those variables interact — and interaction effects are invisible to linear models. A linear boundary through a non-linear problem will always miss the athletes who matter most.
+          </div>
+          <div class="body-s body-s-dark">
+            Gradient boosted decision trees — xgBoost — learn non-linear boundaries by construction. Each tree in the ensemble partitions the feature space differently. Together they identify the combination of mechanical factors that separates athletes who sustain acute knee injuries from those who do not. Injury datasets are structurally imbalanced — injured athletes are always a minority. N1 corrects for this using SMOTE oversampling and stratified repeated k-fold cross-validation across every model run.
+          </div>
+
+          <!-- Simple non-linear scatter SVG -->
+          <svg viewBox="0 0 240 140" width="240" height="140" style="margin-top:8px;">
+            <text x="8" y="12" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)" font-weight="600">DECISION BOUNDARY COMPARISON</text>
+            <!-- Background -->
+            <rect x="0" y="18" width="240" height="118" rx="3" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.08)" stroke-width="1"/>
+            <!-- Green dots (no injury) -->
+            <circle cx="40" cy="80" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="55" cy="60" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="70" cy="95" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="45" cy="110" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="85" cy="75" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="60" cy="45" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="90" cy="105" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="30" cy="55" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="75" cy="40" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="100" cy="58" r="4" fill="rgba(119,221,119,0.6)"/>
+            <!-- Red dots (injury risk) -->
+            <circle cx="140" cy="50" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="160" cy="75" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="180" cy="40" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="155" cy="100" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="200" cy="65" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="175" cy="110" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="210" cy="90" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="195" cy="35" r="4" fill="rgba(232,64,64,0.7)"/>
+            <!-- Mixed zone -->
+            <circle cx="115" cy="68" r="4" fill="rgba(232,64,64,0.7)"/>
+            <circle cx="125" cy="88" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="108" cy="105" r="4" fill="rgba(119,221,119,0.6)"/>
+            <circle cx="130" cy="45" r="4" fill="rgba(232,64,64,0.7)"/>
+            <!-- Linear boundary (wrong) -->
+            <line x1="115" y1="22" x2="115" y2="132" stroke="rgba(245,245,245,0.2)" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <!-- Tree boundary (correct) -->
+            <path d="M 105 22 L 105 70 L 122 70 L 122 90 L 105 90 L 105 132" stroke="rgba(119,221,119,0.5)" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+            <!-- Labels -->
+            <text x="118" y="133" font-family="Inter" font-size="7" fill="rgba(245,245,245,0.25)">Linear</text>
+            <text x="88" y="133" font-family="Inter" font-size="7" fill="rgba(119,221,119,0.5)">Tree</text>
+          </svg>
+        </div>
+
+        <div class="p5-divider"></div>
+
+        <div class="p5-col">
+          <div class="kicker kicker-euc" style="color: var(--amber-lt);">WHY SENSITIVITY</div>
+          <div class="p5-col-head">OPTIMIZE FOR<br>THE COST THAT<br>MATTERS</div>
+          <div class="body-s body-s-dark">
+            Every model makes two kinds of mistakes. The question is which one costs more. Missing an at-risk athlete has consequences that flagging a healthy one does not. One ends a season. The other costs a follow-up conversation.
+          </div>
+          <div class="cost-box" style="margin-top: 4px;">
+            <div class="cost-label" style="color: rgba(245,245,245,0.35);">COST FUNCTION</div>
+            <div class="cost-row">
+              <div class="cost-icon cost-icon-red">✗</div>
+              <div class="cost-row-text"><strong style="color: var(--red);">FALSE NEGATIVE</strong> — at-risk athlete not identified. No intervention. Injury occurs. Season ends.</div>
+            </div>
+            <div class="cost-row">
+              <div class="cost-icon cost-icon-euc">✓</div>
+              <div class="cost-row-text"><strong style="color: var(--eucalyptus);">FALSE POSITIVE</strong> — low-risk athlete flagged. Extra assessment. One conversation. Career intact.</div>
+            </div>
+          </div>
+          <div class="body-s body-s-dark">
+            N1 tunes for sensitivity — the proportion of actual injury cases the model correctly flags. A high AUC with low sensitivity is a model that looks good on paper and fails in the field. Sensitivity is the number that matters when an athlete's career is on the line.
+          </div>
+          <div class="body-s body-s-dark" style="font-size:12px; color: rgba(245,245,245,0.4);">
+            Class imbalance addressed via SMOTE oversampling · Stratified repeated k-fold cross-validation used throughout
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 6 — MODEL PERFORMANCE
+  ════════════════════════════════════ -->
+  <section class="page page-light" id="p6">
+    <div class="ghost ghost-light ghost-p6">06</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-light" style="margin-bottom:0;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag-outline-light">MODEL PERFORMANCE</span>
+      </div>
+
+      <div class="p6-split">
+        <div class="p6-left">
+          <!-- ROC Curve SVG — original N1 design -->
+          <svg viewBox="0 0 320 280" width="320" height="280" style="display:block;">
+            <!-- Axes -->
+            <line x1="40" y1="240" x2="300" y2="240" stroke="rgba(26,26,26,0.2)" stroke-width="1"/>
+            <line x1="40" y1="240" x2="40" y2="20" stroke="rgba(26,26,26,0.2)" stroke-width="1"/>
+            <!-- Axis labels -->
+            <text x="170" y="260" text-anchor="middle" font-family="Inter" font-size="9" fill="rgba(26,26,26,0.4)">FALSE POSITIVE FRACTION</text>
+            <text x="14" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="rgba(26,26,26,0.4)" transform="rotate(-90, 14, 135)">TRUE POSITIVE FRACTION</text>
+            <!-- Grid lines -->
+            <line x1="40" y1="185" x2="300" y2="185" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="40" y1="130" x2="300" y2="130" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="40" y1="75" x2="300" y2="75" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="105" y1="20" x2="105" y2="240" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="170" y1="20" x2="170" y2="240" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="235" y1="20" x2="235" y2="240" stroke="rgba(26,26,26,0.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <!-- Diagonal reference line -->
+            <line x1="40" y1="240" x2="300" y2="20" stroke="rgba(26,26,26,0.15)" stroke-width="1" stroke-dasharray="4,4"/>
+            <!-- Multiple fold curves (light) -->
+            <path d="M 40 240 Q 60 160 90 100 Q 130 55 300 20" stroke="rgba(79,168,79,0.18)" stroke-width="1" fill="none"/>
+            <path d="M 40 240 Q 70 170 100 115 Q 145 60 300 20" stroke="rgba(79,168,79,0.18)" stroke-width="1" fill="none"/>
+            <path d="M 40 240 Q 65 155 95 95 Q 135 48 300 20" stroke="rgba(79,168,79,0.18)" stroke-width="1" fill="none"/>
+            <path d="M 40 240 Q 80 175 110 125 Q 155 68 300 20" stroke="rgba(79,168,79,0.18)" stroke-width="1" fill="none"/>
+            <path d="M 40 240 Q 55 145 88 88 Q 128 42 300 20" stroke="rgba(245,166,35,0.2)" stroke-width="1" fill="none"/>
+            <path d="M 40 240 Q 72 162 102 108 Q 148 58 300 20" stroke="rgba(245,166,35,0.2)" stroke-width="1" fill="none"/>
+            <!-- Mean ROC curve (main) -->
+            <path d="M 40 240 Q 65 148 95 92 Q 138 48 300 20" stroke="var(--eucalyptus-dk)" stroke-width="2.5" fill="none"/>
+            <!-- AUC shading -->
+            <path d="M 40 240 Q 65 148 95 92 Q 138 48 300 20 L 300 240 Z" fill="rgba(79,168,79,0.06)"/>
+            <!-- Axis ticks -->
+            <text x="35" y="243" text-anchor="end" font-family="Inter" font-size="8" fill="rgba(26,26,26,0.35)">0.0</text>
+            <text x="35" y="188" text-anchor="end" font-family="Inter" font-size="8" fill="rgba(26,26,26,0.35)">0.25</text>
+            <text x="35" y="133" text-anchor="end" font-family="Inter" font-size="8" fill="rgba(26,26,26,0.35)">0.50</text>
+            <text x="35" y="78"  text-anchor="end" font-family="Inter" font-size="8" fill="rgba(26,26,26,0.35)">0.75</text>
+            <text x="35" y="24"  text-anchor="end" font-family="Inter" font-size="8" fill="rgba(26,26,26,0.35)">1.0</text>
+            <!-- AUC label on curve -->
+            <text x="185" y="105" font-family="Space Grotesk" font-size="9" fill="var(--eucalyptus-dk)" font-weight="700">MEAN AUC = 0.75</text>
+          </svg>
+        </div>
+
+        <div class="p6-right">
+          <div class="kicker kicker-ink">REFERENCE ARCHITECTURE TARGET</div>
+          <div class="rule-ink"></div>
+          <div class="p6-stat-pair">
+            <div class="p6-stat-item">
+              <div class="p6-stat-val euc">0.75</div>
+              <div class="p6-stat-desc">TARGET AUC VALUE</div>
+            </div>
+            <div class="p6-stat-item">
+              <div class="p6-stat-val euc">0.61</div>
+              <div class="p6-stat-desc">AVERAGE SENSITIVITY TARGET</div>
+            </div>
+          </div>
+
+          <div class="p6-interp">
+            A sensitivity of 0.61 means 6 of every 10 athletes who will sustain an acute knee injury are identified before they sustain it. An AUC of 0.75 means the model correctly ranks a randomly selected injured athlete above a randomly selected healthy one 75% of the time. Both are meaningful results for a small, imbalanced dataset.
+          </div>
+
+          <div class="body-s body-s-light">
+            N1 is building the assessment database required to run this model on Filipino court sport athletes. Every Hawkin Dynamics session adds one more data point. The benchmarks shown here are reference targets drawn from the sports science literature — they represent what N1 is building toward, not what the current dataset has produced.
+          </div>
+
+          <div class="p6-ref-note">
+            REFERENCE ARCHITECTURE — NOT YET DERIVED FROM N1'S OWN DATASET<br>
+            TARGETS WILL BE UPDATED AS N1'S ASSESSMENT DATABASE GROWS
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 7 — RISK DRIVER PROFILING
+  ════════════════════════════════════ -->
+  <section class="page page-dark" id="p7">
+    <div class="ghost ghost-dark ghost-p7">07</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-dark" style="margin-bottom:0;">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag">RISK DRIVER ANALYSIS</span>
+      </div>
+
+      <div class="p7-split">
+        <div class="p7-left">
+          <div class="kicker kicker-euc">INDIVIDUAL PROFILING</div>
+          <div class="p7-head">SAME SCORE.<br><span>DIFFERENT</span><br>STORY.</div>
+          <div class="body-s body-s-dark">
+            Two athletes can share an identical risk score and require entirely different interventions. One may be driven by foot translation under load. The other by a hip deceleration deficit that shifts stress to the knee at landing. Acting on the wrong driver is not neutral — it spends a training block without reducing risk.
+          </div>
+          <div class="body-s body-s-dark">
+            N1 extracts feature importance from the model for each individual athlete after classification. The output is a ranked list of which variables are contributing most to that athlete's score. The intervention is built from that list — not from the score alone, and not from a generic prehab template.
+          </div>
+          <div class="p7-legend">
+            <div class="p7-legend-item">
+              <div class="p7-legend-dot" style="background: var(--eucalyptus);"></div>
+              <div class="p7-legend-text">ATHLETE A</div>
+            </div>
+            <div class="p7-legend-item">
+              <div class="p7-legend-dot" style="background: var(--amber-lt);"></div>
+              <div class="p7-legend-text">ATHLETE B</div>
+            </div>
+          </div>
+          <div class="p7-insight-box">
+            <div class="p7-insight-label">KEY INSIGHT</div>
+            <div class="p7-insight-text">
+              Same risk score. Athlete A's risk is driven by hip posterior chain weakness and body mass loading. Athlete B's risk is driven by foot translation and hip deceleration deficit. These require different exercise prescriptions entirely.
+            </div>
+          </div>
+        </div>
+
+        <div class="p7-right">
+          <!-- Risk Driver Dot Plot SVG — original N1 design -->
+          <svg viewBox="0 0 340 300" width="340" height="300" style="display:block;">
+            <text x="170" y="14" text-anchor="middle" font-family="Space Grotesk" font-size="9.5" fill="rgba(245,245,245,0.5)" font-weight="600">RISK FACTOR PERCENTILE PROFILE</text>
+            <text x="170" y="26" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.25)">Both athletes: HIGH RISK classification</text>
+
+            <!-- Axes -->
+            <line x1="140" y1="36" x2="320" y2="36"   stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
+            <line x1="140" y1="284" x2="320" y2="284"  stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
+            <line x1="140" y1="36"  x2="140" y2="284"  stroke="rgba(245,245,245,0.08)" stroke-width="1"/>
+
+            <!-- Percentile grid -->
+            <line x1="185" y1="36" x2="185" y2="284" stroke="rgba(245,245,245,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+            <line x1="230" y1="36" x2="230" y2="284" stroke="rgba(245,245,245,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+            <line x1="275" y1="36" x2="275" y2="284" stroke="rgba(245,245,245,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+            <line x1="320" y1="36" x2="320" y2="284" stroke="rgba(245,245,245,0.05)" stroke-width="1" stroke-dasharray="2,3"/>
+            <!-- Percentile labels -->
+            <text x="140" y="296" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)">0</text>
+            <text x="185" y="296" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)">25</text>
+            <text x="230" y="296" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)">50</text>
+            <text x="275" y="296" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)">75</text>
+            <text x="320" y="296" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.3)">100</text>
+            <text x="230" y="306" text-anchor="middle" font-family="Inter" font-size="8" fill="rgba(245,245,245,0.2)">PERCENTILE</text>
+
+            <!-- Row labels -->
+            <text x="135" y="60"  text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Foot Translation</text>
+            <text x="135" y="100" text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Hip Decel.</text>
+            <text x="135" y="140" text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Foot Eversion</text>
+            <text x="135" y="180" text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Femoral Rotation</text>
+            <text x="135" y="220" text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Body Mass</text>
+            <text x="135" y="260" text-anchor="end" font-family="Inter" font-size="9" fill="rgba(245,245,245,0.5)">Ankle Dorsiflexion</text>
+
+            <!-- Row dividers -->
+            <line x1="140" y1="76"  x2="320" y2="76"  stroke="rgba(245,245,245,0.05)" stroke-width="1"/>
+            <line x1="140" y1="116" x2="320" y2="116" stroke="rgba(245,245,245,0.05)" stroke-width="1"/>
+            <line x1="140" y1="156" x2="320" y2="156" stroke="rgba(245,245,245,0.05)" stroke-width="1"/>
+            <line x1="140" y1="196" x2="320" y2="196" stroke="rgba(245,245,245,0.05)" stroke-width="1"/>
+            <line x1="140" y1="236" x2="320" y2="236" stroke="rgba(245,245,245,0.05)" stroke-width="1"/>
+
+            <!-- Connecting lines between dots -->
+            <line x1="144" y1="56" x2="302" y2="56" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+            <line x1="185" y1="96" x2="302" y2="96" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+            <line x1="159" y1="136" x2="275" y2="136" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+            <line x1="149" y1="176" x2="263" y2="176" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+            <line x1="149" y1="216" x2="302" y2="216" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+            <line x1="262" y1="256" x2="280" y2="256" stroke="rgba(119,221,119,0.12)" stroke-width="1"/>
+
+            <!-- Athlete A dots (eucalyptus) — low translation, moderate hip, low eversion, low fem rot, low body mass, high ankle -->
+            <circle cx="144" cy="56"  r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="144" y="59" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">2</text>
+            <circle cx="185" cy="96"  r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="185" y="99" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">27</text>
+            <circle cx="159" cy="136" r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="159" y="139" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">12</text>
+            <circle cx="149" cy="176" r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="149" y="179" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">7</text>
+            <circle cx="149" cy="216" r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="149" y="219" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">7</text>
+            <circle cx="262" cy="256" r="5.5" fill="rgba(119,221,119,0.25)" stroke="var(--eucalyptus)" stroke-width="1.5"/>
+            <text x="262" y="259" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--eucalyptus)" font-weight="700">68</text>
+
+            <!-- Athlete B dots (amber) — high translation, high hip decel, high eversion, moderate fem rot, high body mass, moderate ankle -->
+            <circle cx="302" cy="56"  r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="302" y="59" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">80</text>
+            <circle cx="302" cy="96"  r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="302" y="99" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">80</text>
+            <circle cx="275" cy="136" r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="275" y="139" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">68</text>
+            <circle cx="263" cy="176" r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="263" y="179" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">64</text>
+            <circle cx="302" cy="216" r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="302" y="219" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">80</text>
+            <circle cx="280" cy="256" r="5.5" fill="rgba(245,166,35,0.25)" stroke="var(--amber-lt)" stroke-width="1.5"/>
+            <text x="280" y="259" text-anchor="middle" font-family="Inter" font-size="7" fill="var(--amber-lt)" font-weight="700">74</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 8 — FROM DETECTION TO ACTION
+  ════════════════════════════════════ -->
+  <section class="page page-light" id="p8">
+    <div class="ghost ghost-light ghost-p8">08</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-light">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag-outline-light">INTERVENTION PIPELINE</span>
+      </div>
+
+      <div class="kicker kicker-ink" style="margin-top: 24px;">DETECTION IS NOT THE DESTINATION</div>
+      <div class="p8-head">
+        RISK <span>IDENTIFIED.</span><br>NOW WHAT.
+      </div>
+
+      <div class="p8-pipeline">
+        <div class="p8-step">
+          <div class="p8-step-num">01</div>
+          <div class="p8-step-accent">
+            <div class="p8-step-title">ASSESSMENT</div>
+            <div class="p8-step-body">The athlete performs sport-specific movements on the Hawkin Dynamics force plate. N1 extracts the full ground reaction force curve and impulse-momentum breakdown across multiple trials.</div>
+          </div>
+        </div>
+        <div class="p8-step">
+          <div class="p8-step-num">02</div>
+          <div class="p8-step-accent">
+            <div class="p8-step-title">RISK PROFILE</div>
+            <div class="p8-step-body">The model classifies the athlete into a risk tier. Feature importance extraction then identifies which specific variables are driving that classification — ranked, for this athlete, from this session.</div>
+          </div>
+        </div>
+        <div class="p8-step">
+          <div class="p8-step-num">03</div>
+          <div class="p8-step-accent">
+            <div class="p8-step-title">TARGETED PROGRAM</div>
+            <div class="p8-step-body">Exercise selection maps to the top risk drivers — not a general injury prevention template. If hip deceleration is the driver, the block targets posterior chain eccentric capacity. If foot translation is the driver, it targets ankle and foot stability mechanics.</div>
+          </div>
+        </div>
+        <div class="p8-step">
+          <div class="p8-step-num">04</div>
+          <div class="p8-step-accent">
+            <div class="p8-step-title">REASSESSMENT</div>
+            <div class="p8-step-body">After 6 to 8 weeks, the assessment repeats. Two questions get answered: did the target variable move, and did the risk classification change. Those answers determine what the next block addresses.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p8-footer">
+        EVERY INTERVENTION AT N1 TRACES TO A MEASURABLE VARIABLE · SOURCE: HAWKIN DYNAMICS CMJ
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 9 — N1 IS BUILDING THIS NOW
+  ════════════════════════════════════ -->
+  <section class="page page-dark" id="p9">
+    <div class="ghost ghost-dark ghost-p9">09</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%;">
+      <div class="top-bar top-bar-dark">
+        <span>N1 PERFORMANCE LAB</span>
+        <span class="tag">STATUS</span>
+      </div>
+
+      <div class="p9-mid">
+        <div class="p9-hero">N1 IS<br><span>BUILDING</span><br>THIS NOW.</div>
+
+        <div class="p9-status-list">
+          <div class="p9-status-item">
+            <div class="p9-status-icon status-live">●</div>
+            <div class="p9-status-text"><strong>LIVE</strong> — Force plate assessments active. Hawkin Dynamics CMJ data collected per athlete, per session. Database growing.</div>
+          </div>
+          <div class="p9-status-item">
+            <div class="p9-status-icon status-build">◐</div>
+            <div class="p9-status-text"><strong>IN DEVELOPMENT</strong> — Machine learning pipeline. Feature extraction and risk classification architecture being engineered now.</div>
+          </div>
+          <div class="p9-status-item">
+            <div class="p9-status-icon status-soon">○</div>
+            <div class="p9-status-text"><strong>COMING SOON</strong> — 3D Motion Capture integration. When active, all 34 kinematic variables will be captured in a single assessment session.</div>
+          </div>
+          <div class="p9-status-item">
+            <div class="p9-status-icon status-soon">○</div>
+            <div class="p9-status-text"><strong>COMING SOON</strong> — N1 Injury Risk Report. Per-athlete risk classification and ranked risk driver output delivered within 48 hours of assessment.</div>
+          </div>
+        </div>
+
+        <a href="https://n1-magazine.vercel.app" class="p9-cta">LEARN ABOUT N1 ASSESSMENTS →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       PAGE 10 — BACK COVER
+  ════════════════════════════════════ -->
+  <section class="page page-deep" id="p10">
+    <div class="ghost ghost-dark ghost-p10">N1</div>
+
+    <div style="padding: 52px 64px; display:flex; flex-direction:column; width:100%; height:100%;">
+      <div class="top-bar top-bar-dark">
+        <span class="p1-brand">N1 PERFORMANCE LAB</span>
+        <span class="tag-outline-dark">SPORTS SCIENCE PHILIPPINES</span>
+      </div>
+
+      <div class="p10-mid">
+        <div class="p10-hero">
+          THE MOST<br>DETAILED<br>ATHLETE<br><span>DATABASE</span><br>IN SPORT.
+        </div>
+        <div class="p10-sub">
+          N1 is building a movement intelligence platform for Filipino court sport athletes — one assessment at a time. Every trial makes the model smarter. Every athlete adds to the baseline.
+        </div>
+        <div class="p10-contact-row">
+          <div class="p10-contact-item">
+            <div class="p10-contact-label">INSTAGRAM</div>
+            <div class="p10-contact-val">@n1labph</div>
+          </div>
+          <div class="p10-contact-item">
+            <div class="p10-contact-label">LINKEDIN</div>
+            <div class="p10-contact-val">martinalido</div>
+          </div>
+          <div class="p10-contact-item">
+            <div class="p10-contact-label">EMAIL</div>
+            <div class="p10-contact-val">n1labph@gmail.com</div>
+          </div>
+          <div class="p10-contact-item">
+            <div class="p10-contact-label">LOCATION</div>
+            <div class="p10-contact-val">Manila, Philippines</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p10-bottom">
+        <div class="p10-seo">
+          Force plate Philippines · Athlete monitoring Manila · Hawkin Dynamics Philippines · Sports science Philippines · N1 Performance Lab PH
+        </div>
+        <div class="p10-url">n1-magazine.vercel.app/injury-risk-modeling</div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /#magazine -->
+
+<!-- NAV DOTS -->
+<div id="nav-dots">
+  <div class="dot active" data-page="0"></div>
+  <div class="dot" data-page="1"></div>
+  <div class="dot" data-page="2"></div>
+  <div class="dot" data-page="3"></div>
+  <div class="dot" data-page="4"></div>
+  <div class="dot" data-page="5"></div>
+  <div class="dot" data-page="6"></div>
+  <div class="dot" data-page="7"></div>
+  <div class="dot" data-page="8"></div>
+  <div class="dot" data-page="9"></div>
+</div>
+
+<!-- ARROW NAV -->
+<div class="arrow-nav hidden" id="arrow-left" onclick="navigate(-1)">&#8592;</div>
+<div class="arrow-nav" id="arrow-right" onclick="navigate(1)">&#8594;</div>
+
+<script>
+  const magazine  = document.getElementById('magazine');
+  const dots      = document.querySelectorAll('.dot');
+  const arrowL    = document.getElementById('arrow-left');
+  const arrowR    = document.getElementById('arrow-right');
+  const TOTAL     = 10;
+  let current     = 0;
+
+  function goTo(n) {
+    current = Math.max(0, Math.min(TOTAL - 1, n));
+    magazine.scrollTo({ left: current * window.innerWidth, behavior: 'smooth' });
+    updateUI();
+  }
+
+  function navigate(dir) { goTo(current + dir); }
+
+  function updateUI() {
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    arrowL.classList.toggle('hidden', current === 0);
+    arrowR.classList.toggle('hidden', current === TOTAL - 1);
+  }
+
+  dots.forEach(d => d.addEventListener('click', () => goTo(+d.dataset.page)));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); navigate(1); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); navigate(-1); }
+  });
+
+  let scrollTimer;
+  magazine.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const idx = Math.round(magazine.scrollLeft / window.innerWidth);
+      if (idx !== current) { current = idx; updateUI(); }
+    }, 80);
+  });
+
+  let touchStartX = 0;
+  magazine.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+  magazine.addEventListener('touchend', e => {
+    const dx = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 50) navigate(dx > 0 ? 1 : -1);
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    magazine.scrollLeft = current * window.innerWidth;
+  });
+
+  updateUI();
+</script>
+</body>
+</html>
