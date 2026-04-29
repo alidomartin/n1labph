@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="NaNaGv_6ZRpRGSmpVJa_e9CqGlfQUTMNP1QNGcpgs6k" />
+<title>N1 Performance Lab — Forensic Series</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100vh;
+    background: #1A1E24;
+    color: #F5F5F5;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* Header */
+  header {
+    padding: 60px 80px 48px;
+    border-bottom: 1px solid rgba(245,245,245,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #F5F5F5;
+  }
+  .brand span { color: #77DD77; }
+
+  .series-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.35);
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 80px 60px;
+  }
+
+  .hero-kicker {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: #77DD77;
+    margin-bottom: 20px;
+  }
+
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(72px, 10vw, 140px);
+    line-height: 0.9;
+    color: #F5F5F5;
+    letter-spacing: 2px;
+    margin-bottom: 28px;
+  }
+
+  .hero-title span { color: #77DD77; }
+
+  .hero-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    color: rgba(245,245,245,0.45);
+    max-width: 560px;
+    line-height: 1.7;
+  }
+
+  /* Issue grid */
+  .grid {
+    padding: 0 80px 80px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 2px;
+  }
+
+  .issue-card {
+    background: #22272F;
+    padding: 52px 48px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transition: background 0.15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .issue-card:hover {
+    background: #2A3040;
+  }
+
+  .issue-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: #77DD77;
+  }
+
+  .card-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 100px;
+    line-height: 1;
+    color: rgba(245,245,245,0.06);
+    position: absolute;
+    top: 20px;
+    right: 32px;
+    letter-spacing: -2px;
+  }
+
+  .card-issue {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #77DD77;
+  }
+
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    line-height: 1;
+    color: #F5F5F5;
+    letter-spacing: 1px;
+    max-width: 280px;
+  }
+
+  .card-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(245,245,245,0.45);
+    line-height: 1.6;
+    max-width: 280px;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid rgba(245,245,245,0.06);
+  }
+
+  .card-date {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.3);
+  }
+
+  .card-tag {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #77DD77;
+    background: rgba(119,221,119,0.1);
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  .card-tag.coming {
+    color: rgba(245,245,245,0.3);
+    background: rgba(245,245,245,0.05);
+  }
+
+  .card-arrow {
+    font-size: 18px;
+    color: rgba(245,245,245,0.2);
+    margin-left: auto;
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .issue-card:hover .card-arrow {
+    color: #77DD77;
+    transform: translateX(4px);
+  }
+
+  /* Coming soon card */
+  .issue-card.coming-soon {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* Footer */
+  footer {
+    padding: 40px 80px;
+    border-top: 1px solid rgba(245,245,245,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(245,245,245,0.25);
+  }
+  .footer-brand span { color: #77DD77; }
+
+  .footer-note {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 300;
+    color: rgba(245,245,245,0.2);
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 768px) {
+    header, .hero, .grid, footer {
+      padding-left: 28px;
+      padding-right: 28px;
+    }
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">N1 <span>Performance Lab</span></div>
+  <div class="series-label">Forensic Series</div>
+</header>
+
+<section class="hero">
+  <div class="hero-kicker">Force-Time Forensics · Applied Sport Science</div>
+  <div class="hero-title">THE<br><span>FORENSIC</span><br>SERIES</div>
+  <div class="hero-sub">Data-driven athlete analysis for coaching staff who want the forensic read — not just the number.</div>
+</section>
+
+<section class="grid">
+
+  <!-- Issue 01 -->
+  <a class="issue-card" href="/Article_01">
+    <div class="card-num">01</div>
+    <div class="card-issue">Issue 01</div>
+    <div class="card-title">POSITIONAL FORENSICS</div>
+    <div class="card-sub">Why the Middle Blocker and Setter should never share the same loading protocol. Force-time data behind the split.</div>
+    <div class="card-meta">
+      <div class="card-date">Apr 17, 2026</div>
+      <div class="card-tag">Live</div>
+      <div class="card-arrow">→</div>
+    </div>
+  </a>
+
+  <!-- Issue 02 -->
+  <a class="issue-card" href="/Article_02">
+    <div class="card-num">02</div>
+    <div class="card-issue">Issue 02</div>
+    <div class="card-title">BRAKING RFD: GAME DAY READINESS</div>
+    <div class="card-sub">Two outside hitters. Two test dates. What the trajectory says before game day — and what the coaching staff should watch.</div>
+    <div class="card-meta">
+      <div class="card-date">Apr 20, 2026</div>
+      <div class="card-tag">Live</div>
+      <div class="card-arrow">→</div>
+    </div>
+  </a>
+
+  <!-- Issue 03 — placeholder -->
+  <div class="issue-card coming-soon">
+    <div class="card-num">03</div>
+    <div class="card-issue">Issue 03</div>
+    <div class="card-title">COMING SOON</div>
+    <div class="card-sub">Next forensic issue in the series.</div>
+    <div class="card-meta">
+      <div class="card-date">TBD</div>
+      <div class="card-tag coming">Upcoming</div>
+    </div>
+  </div>
+
+</section>
+
+<footer>
+  <div class="footer-brand">N1 <span>Performance Lab</span> · Forensic Series</div>
+  <div class="footer-note">Athlete identities and institutional affiliations protected.</div>
+</footer>
+
+</body>
+</html>
